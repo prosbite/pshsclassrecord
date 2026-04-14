@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             QuarterSeeder::class,
             GradeLevelSectionSeeder::class,
             UserSeeder::class,
-            LearnerSeeder::class,
+            // LearnerSeeder::class,
             AssessmentTypeSeeder::class,
         ]);
     }

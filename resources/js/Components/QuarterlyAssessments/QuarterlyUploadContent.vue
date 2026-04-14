@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     schoolYear: {
@@ -184,7 +184,7 @@ const handleSave = () => {
             saveStatus.value = '';
         },
         onSuccess: () => {
-            saveStatus.value = 'Quarterly assessment saved.';
+            router.visit(route('quarterly-assessments.index'));
         },
         onError: () => {
             saveStatus.value = 'Unable to save. Check the highlighted fields.';

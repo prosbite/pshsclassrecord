@@ -16,24 +16,8 @@ defineProps({
     },
 });
 
-const highlights = [
-    {
-        title: 'Secure PSHS login',
-        description:
-            'Only Philippine Science High School emails can reach the class record portal, keeping scholar data protected.',
-    },
-    {
-        title: 'Classroom-ready insights',
-        description: 'Progress dashboards, attendance notes, and grade snapshots refresh in real time for advisers.',
-    },
-    {
-        title: 'Fast, verifiable access',
-        description: 'Two-factor-ready authentication helps maintain the integrity of every record.',
-    },
-];
-
 const form = useForm({
-    email: '',
+    username: '',
     password: '',
     remember: false,
 });
@@ -46,80 +30,40 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
+    <GuestLayout :full-page="true">
         <Head title="PSHS Class Record Login" />
 
-        <div class="space-y-10 lg:space-y-12">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.6em] text-slate-300">
-                    Philippine Science High School
-                </p>
-                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white">
-                    PSHS Class Record
-                </h1>
-                <p class="mt-3 max-w-3xl text-sm text-slate-200">
-                    Log in with your verified PSHS account to review scholars, update grades, and prepare for advisory
-                    conferences. The class record keeps everything from attendance to honors in one secure space.
-                </p>
-            </div>
+        <div
+            class="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-10"
+            style="background: linear-gradient(180deg, #c6e1ff 0%, #f5fbff 60%, #edf8ff 100%);"
+        >
+            <div class="relative w-full max-w-md">
+                <div class="absolute inset-0 -z-10 rounded-[32px] bg-white/60 blur-[60px]"></div>
+                <div class="rounded-[32px] bg-white/70 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.25)] backdrop-blur">
+                    <div class="flex flex-col items-center gap-1 text-center">
+                        <p class="text-xs uppercase tracking-[0.5em] text-slate-400">PSHS Class Record</p>
+                        <h1 class="text-2xl font-semibold text-slate-900">Sign in with username</h1>
+                        <p class="text-sm text-slate-500">
+                            One secure workspace for advisers, scholars, and admins. Keep classroom data current with a
+                            verified PSHS account.
+                        </p>
+                    </div>
 
-            <div class="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-                <section
-                    class="rounded-3xl bg-gradient-to-br from-sky-900 via-indigo-900 to-slate-900 p-8 text-white shadow-2xl"
-                >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/50 bg-white/10 text-lg font-semibold tracking-[0.3em]"
-                        >
-                            PSHS
-                        </div>
+                    <form @submit.prevent="submit" class="mt-8 space-y-4">
                         <div>
-                            <p class="text-xs uppercase tracking-[0.4em] text-slate-200">Class Record</p>
-                            <p class="text-xl font-semibold text-white">Scholars, advisers, and advisors</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-8 space-y-4 text-sm text-slate-100">
-                        <div
-                            v-for="item in highlights"
-                            :key="item.title"
-                            class="flex items-start gap-3"
-                        >
-                            <span class="mt-1 h-2 w-2 rounded-full bg-emerald-400"></span>
-                            <div>
-                                <p class="font-semibold text-white">{{ item.title }}</p>
-                                <p class="text-xs text-slate-200">{{ item.description }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section
-                    class="rounded-3xl bg-white/90 p-8 shadow-xl ring-1 ring-slate-900/5 backdrop-blur"
-                >
-                    <div class="mb-6 text-xs uppercase tracking-[0.45em] text-slate-500">
-                        Login
-                    </div>
-
-                    <div v-if="status" class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800">
-                        {{ status }}
-                    </div>
-
-                    <form @submit.prevent="submit" class="space-y-5">
-                        <div>
-                            <InputLabel for="email" value="School Email" />
+                            <InputLabel for="username" value="Username" />
 
                             <TextInput
-                                id="email"
-                                type="email"
-                                class="mt-1 block w-full text-black"
-                                v-model="form.email"
+                                id="username"
+                                type="text"
+                                class="mt-2 block w-full rounded-[16px] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none"
+                                v-model="form.username"
                                 required
                                 autofocus
                                 autocomplete="username"
                             />
 
-                            <InputError class="mt-2" :message="form.errors.email" />
+                            <InputError class="mt-2 text-xs text-rose-600" :message="form.errors.username" />
                         </div>
 
                         <div>
@@ -128,16 +72,16 @@ const submit = () => {
                             <TextInput
                                 id="password"
                                 type="password"
-                                class="mt-1 block w-full text-black"
+                                class="mt-2 block w-full rounded-[16px] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none"
                                 v-model="form.password"
                                 required
                                 autocomplete="current-password"
                             />
 
-                            <InputError class="mt-2" :message="form.errors.password" />
+                            <InputError class="mt-2 text-xs text-rose-600" :message="form.errors.password" />
                         </div>
 
-                        <div class="flex items-center justify-between text-sm text-slate-600">
+                        <div class="flex items-center justify-between text-xs text-slate-500">
                             <label class="flex items-center gap-2">
                                 <Checkbox name="remember" v-model:checked="form.remember" />
                                 <span>Remember me</span>
@@ -153,14 +97,15 @@ const submit = () => {
                         </div>
 
                         <PrimaryButton
-                            class="w-full"
-                            :class="{ 'opacity-25': form.processing }"
+                            class="flex w-full items-center justify-center rounded-[16px] bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            :class="{ 'opacity-50': form.processing }"
                             :disabled="form.processing"
                         >
-                            Continue to dashboard
+                            Sign in
                         </PrimaryButton>
                     </form>
-                </section>
+
+                </div>
             </div>
         </div>
     </GuestLayout>

@@ -17,11 +17,6 @@ class GradeLevelSectionSeeder extends Seeder
     public function run(): void
     {
         $gradeLevels = [
-            'Grade 7' => ['Nova', 'Orion', 'Solstice'],
-            'Grade 8' => ['Aurora', 'Vanguard', 'Zenith'],
-            'Grade 9' => ['Aether', 'Beacon', 'Crest'],
-            'Grade 10' => ['Summit', 'Pioneer', 'Harbor'],
-            'Grade 11' => ['Stratus', 'Horizon', 'Catalyst'],
             'Grade 12' => ['Del Mundo', 'Orosa', 'Zara'],
         ];
 
