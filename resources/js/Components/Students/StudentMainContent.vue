@@ -101,11 +101,12 @@ const structuredStudents = computed(() => {
         const formattedName = learner.last_name
             ? `${learner.last_name}, ${learner.first_name || ''}${middleInitial ? ` ${middleInitial}` : ''}`
             : name || learner.email || 'Learner';
+        const username = learner.user?.username ?? learner.email ?? '—';
 
         return {
             id: enrollment.id,
             name: formattedName,
-            email: learner.email,
+            username,
             role: learner.role ?? 'Scholar',
             status: enrollment.status ?? learner.status ?? 'Unknown',
             grade_level: gradeLevel.grade_level ?? '',
@@ -290,7 +291,7 @@ const uploadCsv = async (file) => {
                     v-model="search"
                     @input="pushFilters"
                     type="text"
-                    placeholder="Search by name, email, grade, section, status"
+                placeholder="Search by name, username, grade, section, status"
                     class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
                 />
             </label>
@@ -303,7 +304,7 @@ const uploadCsv = async (file) => {
                         <tr>
                             <th class="px-6 py-4 font-semibold">ID</th>
                             <th class="px-6 py-4 font-semibold">Name</th>
-                            <th class="px-6 py-4 font-semibold">Email</th>
+                            <th class="px-6 py-4 font-semibold">Username</th>
                             <th class="px-6 py-4 font-semibold">Grade Level</th>
                             <th class="px-6 py-4 font-semibold">Section</th>
                             <th class="px-6 py-4 font-semibold">Role</th>
@@ -324,7 +325,7 @@ const uploadCsv = async (file) => {
                                 {{ student.name }}
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-600">
-                                {{ student.email }}
+                                {{ student.username || '—' }}
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-600">
                                 {{ student.grade_level || '—' }}

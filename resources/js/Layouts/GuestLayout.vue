@@ -1,6 +1,13 @@
 <script setup>
 import { ref } from 'vue';
 
+const props = defineProps({
+    fullPage: {
+        type: Boolean,
+        default: false,
+    },
+});
+
 const menuOpen = ref(false);
 
 const toggleMenu = () => {
@@ -19,7 +26,12 @@ const panelHighlights = [
 </script>
 
 <template>
-    <div class="relative flex min-h-screen bg-slate-950 text-white">
+    <div v-if="props.fullPage" class="flex min-h-screen">
+        <main class="flex flex-1 flex-col justify-center px-0 py-0">
+            <slot />
+        </main>
+    </div>
+    <div v-else class="relative flex min-h-screen bg-slate-950 text-white">
         <button
             type="button"
             class="absolute top-4 left-4 z-30 inline-flex items-center gap-2 rounded-full border border-white/30 bg-slate-900/70 px-3 py-2 text-sm font-semibold backdrop-blur transition hover:border-white lg:hidden"
@@ -58,9 +70,9 @@ const panelHighlights = [
                 </div>
 
                 <div class="space-y-3 text-sm">
-                    <div v-for="item in panelHighlights" :key="item.title" class="flex gap-3">
+                    <div v-for="item in panelHighlights" :key="item" class="flex gap-3">
                         <span class="mt-1 h-2 w-2 rounded-full bg-emerald-400"></span>
-                        <p class="text-slate-200">{{ item.text }}</p>
+                        <p class="text-slate-200">{{ item }}</p>
                     </div>
                 </div>
 

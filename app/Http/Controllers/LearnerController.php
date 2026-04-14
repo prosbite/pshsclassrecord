@@ -20,7 +20,7 @@ class LearnerController extends Controller
             $sectionName = 'Del Mundo';
         }
 
-        $enrollments = Enrollment::with(['learner', 'section.gradeLevel', 'schoolYear'])
+        $enrollments = Enrollment::with(['learner.user', 'section.gradeLevel', 'schoolYear'])
             ->join('learners', 'learners.id', '=', 'enrollments.learner_id')
             ->when($sectionName, function ($query) use ($sectionName) {
                 $query->whereHas('section', function ($section) use ($sectionName) {
@@ -33,10 +33,16 @@ class LearnerController extends Controller
                 });
             })
             ->when($search, function ($query) use ($search) {
-                $query->whereHas('learner', function ($learner) use ($search) {
-                    $learner->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                $query->where(function ($query) use ($search) {
+                    $query->whereHas('learner', function ($learner) use ($search) {
+                        $learner->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('learner.user', function ($user) use ($search) {
+                        $user->where('username', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
                 });
             })
             ->orderBy('learners.last_name')

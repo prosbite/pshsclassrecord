@@ -7,7 +7,9 @@ use App\Models\GradeLevel;
 use App\Models\Learner;
 use App\Models\SchoolYear;
 use App\Models\Section;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -58,6 +60,12 @@ class EnrollmentController extends Controller
             'year_end' => now()->year + 1,
             'status' => 'active',
         ]);
+
+        $reservedUsernames = User::whereNotNull('username')
+            ->pluck('username')
+            ->filter()
+            ->map(fn ($username) => Str::lower((string) $username))
+            ->all();
 
         foreach ($rows as $rowNumber => $row) {
             if (collect($row)->filter()->isEmpty()) {
@@ -130,6 +138,16 @@ class EnrollmentController extends Controller
                 ]
             );
 
+            $learner->loadMissing('user');
+
+            if (! $learner->user) {
+                $usernameBase = $this->buildStudentUsernameBase($record['first_name'], $record['last_name']);
+                $username = $this->reserveUniqueUsername($usernameBase, $reservedUsernames);
+                $user = $this->createStudentUser($username, $record);
+                $learner->user()->associate($user);
+                $learner->save();
+            }
+
             Enrollment::updateOrCreate(
                 [
                     'learner_id' => $learner->id,
@@ -149,5 +167,78 @@ class EnrollmentController extends Controller
             'message' => 'Processed ' . $totalProcessed . ' rows',
             'summary' => $results,
         ]);
+    }
+
+    private function buildStudentUsernameBase(string $firstName, string $lastName): string
+    {
+        $nameParts = array_values(array_filter(preg_split('/\s+/', trim($firstName))));
+        $initials = '';
+
+        if (isset($nameParts[0]) && $nameParts[0] !== '') {
+            $initials .= Str::substr($nameParts[0], 0, 1);
+        }
+
+        if (isset($nameParts[1]) && $nameParts[1] !== '') {
+            $initials .= Str::substr($nameParts[1], 0, 1);
+        }
+
+        $lastNameSlug = Str::slug($lastName, '');
+
+        if ($lastNameSlug === '') {
+            $lastNameSlug = 'student';
+        }
+
+        return Str::lower($lastNameSlug . $initials);
+    }
+
+    private function reserveUniqueUsername(string $base, array &$reserved): string
+    {
+        $seed = $base !== '' ? $base : 'student';
+        $username = $seed;
+        $counter = 1;
+
+        while (in_array($username, $reserved, true)) {
+            $username = $seed . $counter;
+            $counter++;
+        }
+
+        $reserved[] = $username;
+
+        return $username;
+    }
+
+    private function createStudentUser(string $username, array $record): User
+    {
+        $payload = [
+            'name' => $this->buildStudentFullName($record),
+            'username' => $username,
+            'email' => $this->buildStudentEmail($username),
+            'password' => Hash::make("{$username}12345"),
+        ];
+
+        $user = User::create($payload);
+
+        $user->forceFill([
+            'role' => 'student',
+            'status' => 'active',
+        ])->save();
+
+        return $user;
+    }
+
+    private function buildStudentFullName(array $record): string
+    {
+        $parts = array_filter([
+            $record['first_name'] ?? null,
+            $record['middle_name'] ?? null,
+            $record['last_name'] ?? null,
+        ]);
+
+        return trim(implode(' ', $parts));
+    }
+
+    private function buildStudentEmail(string $username): string
+    {
+        return Str::lower("{$username}@students.pshs.edu.ph");
     }
 }
