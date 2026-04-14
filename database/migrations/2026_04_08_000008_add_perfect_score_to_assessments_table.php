@@ -6,17 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::table('assessments', function (Blueprint ) {
-            ->integer('perfect_score')->default(100)->after('title');
+        Schema::table('assessments', function (Blueprint $table) {
+            $table->integer('perfect_score')->default(100)->after('title');
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::table('assessments', function (Blueprint ) {
-            ->dropColumn('perfect_score');
+        Schema::table('assessments', function (Blueprint $table) {
+            $table->dropColumn('perfect_score');
         });
     }
 };
