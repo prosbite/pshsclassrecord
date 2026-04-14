@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import {
   HomeIcon,
@@ -12,6 +12,37 @@ import {
 
 const page = usePage()
 const user = page.props.auth.user
+const normalizePath = (link) => {
+  if (!link) {
+    return ''
+  }
+  try {
+    return new URL(link, window.location.origin).pathname
+  } catch {
+    return link
+  }
+}
+const currentPath = computed(() => {
+  try {
+    return new URL(page.url).pathname
+  } catch {
+    return page.url
+  }
+})
+
+const quarterlyPaths = [
+  normalizePath(route('quarterly-assessments.index')),
+  normalizePath(route('quarterly-assessments.upload')),
+]
+
+const isQuarterlyActive = computed(() =>
+  quarterlyPaths.some((path) => currentPath.value.startsWith(path))
+)
+
+const studentsPath = normalizePath(route('students'))
+const assessmentsPath = normalizePath(route('assessments.index'))
+const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
+const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
 
 const sidebarOpen = ref(false)
 const isCollapsed = ref(false)
@@ -100,21 +131,30 @@ const toggleCollapse = () => {
       <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
 
         <Link
-          href="/students"
+          :href="studentsPath"
           class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': $page.url.startsWith('/students') }"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isStudentsActive }"
         >
           <UsersIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Students</span>
         </Link>
 
         <Link
-          href="/assessments"
+          :href="assessmentsPath"
           class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': $page.url.startsWith('/assessments') }"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isAssessmentsActive }"
         >
           <ChartBarIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Assessments</span>
+        </Link>
+
+        <Link
+          :href="route('quarterly-assessments.index')"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuarterlyActive }"
+        >
+          <FolderIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Quarterly CSV</span>
         </Link>
       </nav>
 
@@ -167,7 +207,7 @@ const toggleCollapse = () => {
               <span class="text-xs text-slate-500">{{ user.email }}</span>
             </div>
             <Link
-              href="/logout"
+              :href="route('logout')"
               method="post"
               as="button"
               class="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-xl hover:bg-slate-100"

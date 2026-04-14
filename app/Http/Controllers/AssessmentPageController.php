@@ -83,6 +83,7 @@ class AssessmentPageController extends Controller
             'quarter',
             'section.gradeLevel',
             'user',
+            'learners',
         ])->withCount('learners');
 
         if ($schoolYear) {
@@ -114,10 +115,13 @@ class AssessmentPageController extends Controller
             ->orderBy('section_name')
             ->get();
 
+        $section = Section::with('enrollments.learner')
+            ->find($sectionFilter);
         return [
             'assessments' => $assessments,
             'schoolYear' => $schoolYear,
             'sections' => $sections,
+            'section' => $section,
             'sectionFilter' => $sectionFilter ?? 'all',
         ];
     }

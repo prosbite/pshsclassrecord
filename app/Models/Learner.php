@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,6 +19,7 @@ class Learner extends Model
         'gender',
         'status',
         'email_verified_at',
+        'user_id',
     ];
 
     protected $casts = [
@@ -39,5 +41,10 @@ class Learner extends Model
         return $this->belongsToMany(Assessment::class, 'assessment_learners')
             ->withPivot('score')
             ->withTimestamps();
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

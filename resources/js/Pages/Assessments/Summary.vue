@@ -16,6 +16,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    section: {
+        type: Object,
+        default: 'all',
+    },
     sectionFilter: {
         type: String,
         default: 'all',
@@ -47,6 +51,7 @@ const props = defineProps({
                 :assessments="props.assessments"
                 :school-year="props.schoolYear"
                 :sections="props.sections"
+                :section="props.section"
                 :section-filter="props.sectionFilter"
             />
         </div>
