@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
 
@@ -62,25 +62,11 @@ const quarterAssessmentsByIndex = computed(() => {
     );
 });
 
-const selectedQuarter = ref(null);
+const selectedQuarter = ref(4);
 const selectedQuarterAssessment = computed(() => {
     if (!selectedQuarter.value) return null;
     return (quarterAssessmentsByIndex.value[selectedQuarter.value] ?? [])[0] ?? null;
 });
-
-const defaultQuarterWithData = computed(() =>
-    quarterOrder.find(quarter => quarterAssessmentsByIndex.value[quarter]?.length)
-);
-
-watch(() => defaultQuarterWithData.value, (value) => {
-    if (!value) {
-        selectedQuarter.value = null;
-        return;
-    }
-    if (!selectedQuarter.value || !quarterAssessmentsByIndex.value[selectedQuarter.value]?.length) {
-        selectedQuarter.value = value;
-    }
-}, { immediate: true });
 
 // ... (Keep all your other methods unchanged: quarterTitle, getColumns, formatUploadedAt, etc.)
 const quarterTitle = (assessment) => assessment.quarter?.name || (assessment.quarter?.index ? `Quarter ${assessment.quarter.index}` : 'Quarter');
@@ -114,6 +100,26 @@ const formatTwoDecimals = (value) => {
     }
 
     return value;
+};
+
+const formatAssessmentValue = (label, value) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const normalizedLabel = (label ?? '').toString().trim().toLowerCase();
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return value;
+    }
+
+    if (normalizedLabel === 'percentage' || normalizedLabel === 'weighted %') {
+        const percentageValue = Math.abs(numericValue) <= 1 ? numericValue * 100 : numericValue;
+        return `${percentageValue.toFixed(2)}%`;
+    }
+
+    return numericValue.toFixed(2);
 };
 
 const normalizeHeaderLabel = (header) => {
@@ -370,7 +376,7 @@ const twoThirdEntry = (assessment) => {
                                     >
                                         <span class="font-medium text-slate-700">{{ entryLabel(segment, item.label, entryIndex) }}</span>
                                         <div class="text-right">
-                                            <span class="font-semibold text-slate-900">{{ formatTwoDecimals(item.value) }}</span>
+                                            <span class="font-semibold text-slate-900">{{ formatAssessmentValue(item.label, item.value) }}</span>
                                             <span v-if="item.perfectScore"
                                                   class="block text-xs text-slate-400 tracking-wider">
                                                 / {{ formatTwoDecimals(item.perfectScore) }}
