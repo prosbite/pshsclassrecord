@@ -302,13 +302,13 @@ const twoThirdEntry = (assessment) => {
                         </p>
                     </div>
 
-                    <div class="flex-shrink-0 text-right">
+                    <!-- <div class="flex-shrink-0 text-right">
                         <p class="text-xs uppercase tracking-[0.125em] text-slate-400">Quarterly Uploads</p>
                         <p class="mt-1 text-5xl font-semibold tracking-tighter text-slate-900">
                             {{ hasAssessments ? props.quarterlyAssessments.length : 0 }}
                         </p>
                         <p class="text-sm text-slate-500">assessments</p>
-                    </div>
+                    </div> -->
                 </div>
             </div>
 
