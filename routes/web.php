@@ -42,6 +42,7 @@ Route::prefix('admin')
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
         Route::get('/students', [LearnerController::class, 'index'])->name('students');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');
+        Route::post('/students/bulk-update-emails', [EnrollmentController::class, 'bulkUpdateEmails'])->name('students.bulk-update-emails');
         Route::get('/assessments/create', [AssessmentPageController::class, 'create'])->name('assessments.create');
         Route::get('/assessments/section-learners', [AssessmentController::class, 'sectionLearners'])->name('assessments.section-learners');
         Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');

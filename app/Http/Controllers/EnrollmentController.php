@@ -9,6 +9,7 @@ use App\Models\SchoolYear;
 use App\Models\Section;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -22,18 +23,12 @@ class EnrollmentController extends Controller
             'file' => ['required', 'file', 'mimes:csv,xlsx,xls'],
         ]);
 
-        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
-        $worksheet = $spreadsheet->getActiveSheet();
-        $rows = array_map(
-            fn ($row) => array_values($row),
-            $worksheet->toArray(null, true, true, true)
-        );
+        [$header, $rows] = $this->loadSpreadsheetRows($request);
 
         if (empty($rows)) {
             return response()->json(['error' => 'The uploaded file is empty'], 422);
         }
 
-        $header = array_shift($rows);
         $header = array_map(fn ($value) => Str::snake(trim((string) $value)), $header);
 
         $requiredColumns = [
@@ -83,7 +78,7 @@ class EnrollmentController extends Controller
             }
 
             $record = array_combine($header, $row);
-            $record = array_map(fn ($value) => trim(preg_replace('/\s+/', ' ', (string) $value)), $record);
+            $record = $this->normalizeRecordValues($record);
 
             $validator = Validator::make($record, [
                 'first_name' => ['required', 'string', 'max:255'],
@@ -167,6 +162,163 @@ class EnrollmentController extends Controller
             'message' => 'Processed ' . $totalProcessed . ' rows',
             'summary' => $results,
         ]);
+    }
+
+    public function bulkUpdateEmails(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv'],
+        ]);
+
+        [$header, $rows] = $this->loadSpreadsheetRows($request);
+
+        if (empty($rows)) {
+            return response()->json(['error' => 'The uploaded file is empty'], 422);
+        }
+
+        $header = array_map(fn ($value) => Str::snake(trim((string) $value)), $header);
+
+        $requiredColumns = [
+            'first_name',
+            'last_name',
+            'email',
+        ];
+
+        $missingColumns = array_diff($requiredColumns, $header);
+        if (! empty($missingColumns)) {
+            return response()->json([
+                'error' => 'Missing columns: ' . implode(', ', $missingColumns),
+            ], 422);
+        }
+
+        $results = ['updated' => [], 'failed' => []];
+        $totalProcessed = 0;
+
+        foreach ($rows as $rowNumber => $row) {
+            if (collect($row)->filter(fn ($value) => trim((string) $value) !== '')->isEmpty()) {
+                continue;
+            }
+
+            $row = array_slice($row, 0, count($header));
+
+            if (count($row) !== count($header)) {
+                $results['failed'][] = [
+                    'row' => $row,
+                    'reason' => 'Column mismatch at row ' . ($rowNumber + 2),
+                ];
+                continue;
+            }
+
+            $record = array_combine($header, $row);
+            $record = $this->normalizeRecordValues($record);
+
+            $validator = Validator::make($record, [
+                'first_name' => ['required', 'string', 'max:255'],
+                'last_name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'email:rfc', 'max:255'],
+            ]);
+
+            if ($validator->fails()) {
+                $results['failed'][] = [
+                    'row' => $record,
+                    'errors' => $validator->errors()->all(),
+                ];
+                continue;
+            }
+
+            $firstName = Str::lower($record['first_name']);
+            $lastName = Str::lower($record['last_name']);
+            $email = Str::lower($record['email']);
+
+            $learners = Learner::with('user')
+                ->whereRaw('LOWER(TRIM(first_name)) = ?', [$firstName])
+                ->whereRaw('LOWER(TRIM(last_name)) = ?', [$lastName])
+                ->get();
+
+            if ($learners->isEmpty()) {
+                $results['failed'][] = [
+                    'row' => $record,
+                    'reason' => 'No learner matched the provided name',
+                ];
+                continue;
+            }
+
+            if ($learners->count() > 1) {
+                $results['failed'][] = [
+                    'row' => $record,
+                    'reason' => 'Multiple learners matched the provided name',
+                ];
+                continue;
+            }
+
+            $learner = $learners->first();
+
+            if (! $learner->user) {
+                $results['failed'][] = [
+                    'row' => $record,
+                    'reason' => 'Matched learner does not have a linked user account',
+                ];
+                continue;
+            }
+
+            $emailInUse = User::query()
+                ->whereRaw('LOWER(email) = ?', [$email])
+                ->where('id', '!=', $learner->user->id)
+                ->exists();
+
+            if ($emailInUse) {
+                $results['failed'][] = [
+                    'row' => $record,
+                    'reason' => 'Email is already assigned to another user',
+                ];
+                continue;
+            }
+
+            DB::transaction(function () use ($learner, $email) {
+                $learner->email = $email;
+                $learner->save();
+
+                $learner->user->email = $email;
+                $learner->user->save();
+            });
+
+            $results['updated'][] = [
+                'learner_id' => $learner->id,
+                'email' => $email,
+            ];
+            $totalProcessed++;
+        }
+
+        return response()->json([
+            'message' => 'Processed ' . $totalProcessed . ' rows',
+            'summary' => $results,
+        ]);
+    }
+
+    private function loadSpreadsheetRows(Request $request): array
+    {
+        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = array_map(
+            fn ($row) => array_values($row),
+            $worksheet->toArray(null, true, true, true)
+        );
+
+        if (empty($rows)) {
+            return [[], []];
+        }
+
+        $header = array_shift($rows);
+
+        return [$header, $rows];
+    }
+
+    private function normalizeRecordValues(array $record): array
+    {
+        return array_map(
+            fn ($value) => trim(preg_replace('/\s+/', ' ', (string) $value)),
+            $record
+        );
     }
 
     private function buildStudentUsernameBase(string $firstName, string $lastName): string
