@@ -68,6 +68,11 @@ const selectedQuarterAssessment = computed(() => {
     return (quarterAssessmentsByIndex.value[selectedQuarter.value] ?? [])[0] ?? null;
 });
 
+const isFourthQuarterAssessment = (assessment) => {
+    const quarterIndex = Number(assessment?.quarter?.index ?? assessment?.quarter?.quarter ?? null);
+    return quarterIndex === 4;
+};
+
 // ... (Keep all your other methods unchanged: quarterTitle, getColumns, formatUploadedAt, etc.)
 const quarterTitle = (assessment) => assessment.quarter?.name || (assessment.quarter?.index ? `Quarter ${assessment.quarter.index}` : 'Quarter');
 
@@ -120,6 +125,32 @@ const formatAssessmentValue = (label, value) => {
     }
 
     return numericValue.toFixed(2);
+};
+
+const normalizeTentativeLabel = (label) => {
+    return (label ?? '').toString().toLowerCase().replace(/\s+/g, '');
+};
+
+const isTentativeScore = (assessment, segment, item, entryIndex) => {
+    if (!isFourthQuarterAssessment(assessment)) {
+        return false;
+    }
+
+    const normalizedLabel = normalizeTentativeLabel(item?.label);
+
+    if (segment === 'lt2' && entryIndex === 0) {
+        return true;
+    }
+
+    if (segment === 'aa' && /^aa2\b/.test(normalizedLabel)) {
+        return true;
+    }
+
+    if (segment === 'fa' && /^fa3\b/.test(normalizedLabel)) {
+        return true;
+    }
+
+    return false;
 };
 
 const normalizeHeaderLabel = (header) => {
@@ -372,10 +403,21 @@ const twoThirdEntry = (assessment) => {
                                     <div
                                         v-for="(item, entryIndex) in detailEntriesForSegment(selectedQuarterAssessment, segment)"
                                         :key="`${selectedQuarterAssessment.id}-${segment}-${item.label}`"
-                                        class="flex justify-between items-center rounded-2xl bg-slate-50 px-5 py-4 text-sm"
+                                        :class="[
+                                            'flex justify-between items-center rounded-2xl px-5 py-4 text-sm transition-colors',
+                                            isTentativeScore(selectedQuarterAssessment, segment, item, entryIndex)
+                                                ? 'border border-amber-300 bg-amber-50/80'
+                                                : 'bg-slate-50',
+                                        ]"
                                     >
                                         <span class="font-medium text-slate-700">{{ entryLabel(segment, item.label, entryIndex) }}</span>
                                         <div class="text-right">
+                                            <span
+                                                v-if="isTentativeScore(selectedQuarterAssessment, segment, item, entryIndex)"
+                                                class="mb-1 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-800"
+                                            >
+                                                Tentative Score
+                                            </span>
                                             <span class="font-semibold text-slate-900">{{ formatAssessmentValue(item.label, item.value) }}</span>
                                             <span v-if="item.perfectScore"
                                                   class="block text-xs text-slate-400 tracking-wider">
