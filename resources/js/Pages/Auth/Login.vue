@@ -31,7 +31,7 @@ const submit = () => {
 
 <template>
     <GuestLayout :full-page="true">
-        <Head title="PSHS Class Record Login" />
+        <Head title="Class Record Login" />
 
         <div
             class="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-10"
@@ -41,7 +41,7 @@ const submit = () => {
                 <div class="absolute inset-0 -z-10 rounded-[32px] bg-white/60 blur-[60px]"></div>
                 <div class="rounded-[32px] bg-white/70 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.25)] backdrop-blur">
                     <div class="flex flex-col items-center gap-1 text-center">
-                        <p class="text-xs uppercase tracking-[0.5em] text-slate-400">PSHS Class Record</p>
+                        <p class="text-xs uppercase tracking-[0.5em] text-slate-400">Class Record</p>
                         <h1 class="text-2xl font-semibold text-slate-900">Sign in with username</h1>
                         <p class="text-sm text-slate-500">
                             One secure workspace for advisers, scholars, and admins. Keep classroom data current with a
