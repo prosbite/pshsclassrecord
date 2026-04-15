@@ -38,10 +38,14 @@ watch(
     },
     { immediate: true, deep: true }
 );
-const fileInput = ref(null);
-const uploadedFileName = ref('');
-const uploadInProgress = ref(false);
-const uploadFeedback = ref('');
+const registerFileInput = ref(null);
+const registerFileName = ref('');
+const registerUploadInProgress = ref(false);
+const registerUploadFeedback = ref('');
+const updateEmailsFileInput = ref(null);
+const updateEmailsFileName = ref('');
+const updateEmailsInProgress = ref(false);
+const updateEmailsUploadFeedback = ref('');
 
 const gradeSections = computed(() => {
     return props.gradeLevels.reduce((acc, level) => {
@@ -101,13 +105,13 @@ const structuredStudents = computed(() => {
         const formattedName = learner.last_name
             ? `${learner.last_name}, ${learner.first_name || ''}${middleInitial ? ` ${middleInitial}` : ''}`
             : name || learner.email || 'Learner';
-        const username = learner.user?.username ?? learner.email ?? '—';
+        const username = learner.user?.username ?? '—';
 
         return {
             id: enrollment.id,
             name: formattedName,
             username,
-            role: learner.role ?? 'Scholar',
+            email: learner.user?.email ?? learner.email ?? '—',
             status: enrollment.status ?? learner.status ?? 'Unknown',
             grade_level: gradeLevel.grade_level ?? '',
             section: section.section_name ?? '',
@@ -154,30 +158,50 @@ function pushFilters() {
     }, 300);
 };
 
-const triggerCsvUpload = () => {
-    fileInput.value?.click();
+const triggerRegisterCsvUpload = () => {
+    registerFileInput.value?.click();
 };
 
-const handleCsvUpload = async (event) => {
+const triggerUpdateEmailsUpload = () => {
+    updateEmailsFileInput.value?.click();
+};
+
+const handleRegisterCsvUpload = async (event) => {
     const file = event.target?.files?.[0];
     if (!file) {
         return;
     }
 
-    uploadedFileName.value = file.name;
-    await uploadCsv(file);
+    registerFileName.value = file.name;
+    await uploadCsv(file, route('students.bulk-register'), registerUploadInProgress, registerUploadFeedback);
     event.target.value = '';
 };
 
-const uploadCsv = async (file) => {
-    uploadInProgress.value = true;
-    uploadFeedback.value = '';
+const handleUpdateEmailsUpload = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) {
+        return;
+    }
+
+    updateEmailsFileName.value = file.name;
+    await uploadCsv(
+        file,
+        route('students.bulk-update-emails'),
+        updateEmailsInProgress,
+        updateEmailsUploadFeedback
+    );
+    event.target.value = '';
+};
+
+const uploadCsv = async (file, endpoint, inProgressRef, feedbackRef) => {
+    inProgressRef.value = true;
+    feedbackRef.value = '';
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-        const response = await fetch(route('students.bulk-register'), {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -195,11 +219,11 @@ const uploadCsv = async (file) => {
             throw new Error(payload.error ?? 'Upload failed');
         }
 
-        uploadFeedback.value = payload.message ?? 'Upload completed';
+        feedbackRef.value = payload.message ?? 'Upload completed';
     } catch (error) {
-        uploadFeedback.value = error.message;
+        feedbackRef.value = error.message;
     } finally {
-        uploadInProgress.value = false;
+        inProgressRef.value = false;
     }
 };
 </script>
@@ -216,24 +240,35 @@ const uploadCsv = async (file) => {
                     </p>
                 </div>
 
-                <div class="flex flex-col items-end gap-2">
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:from-cyan-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                        @click="triggerCsvUpload"
-                        :disabled="uploadInProgress"
-                    >
-                        Register Students
-                    </button>
-                    <span v-if="uploadInProgress" class="text-xs text-slate-500">
-                        Uploading…
-                    </span>
-                    <span v-else-if="uploadFeedback" class="text-xs text-slate-500">
-                        {{ uploadFeedback }}
-                    </span>
-                    <span v-else-if="uploadedFileName" class="text-xs text-slate-500">
-                        Selected file: {{ uploadedFileName }}
-                    </span>
+                <div class="flex flex-col items-end gap-3">
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:from-cyan-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                            @click="triggerRegisterCsvUpload"
+                            :disabled="registerUploadInProgress"
+                        >
+                            Register Students
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            @click="triggerUpdateEmailsUpload"
+                            :disabled="updateEmailsInProgress"
+                        >
+                            Update Emails
+                        </button>
+                    </div>
+                    <div class="space-y-1 text-right text-xs text-slate-500">
+                        <p v-if="registerUploadInProgress">Uploading student records…</p>
+                        <p v-else-if="registerUploadFeedback">{{ registerUploadFeedback }}</p>
+                        <p v-else-if="registerFileName">Selected register file: {{ registerFileName }}</p>
+                        <p v-if="updateEmailsInProgress">Updating student emails…</p>
+                        <p v-else-if="updateEmailsUploadFeedback">{{ updateEmailsUploadFeedback }}</p>
+                        <p v-else-if="updateEmailsFileName">
+                            Selected email file: {{ updateEmailsFileName }}
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -291,7 +326,7 @@ const uploadCsv = async (file) => {
                     v-model="search"
                     @input="pushFilters"
                     type="text"
-                placeholder="Search by name, username, grade, section, status"
+                    placeholder="Search by name, username, email, grade, section, status"
                     class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
                 />
             </label>
@@ -307,7 +342,7 @@ const uploadCsv = async (file) => {
                             <th class="px-6 py-4 font-semibold">Username</th>
                             <th class="px-6 py-4 font-semibold">Grade Level</th>
                             <th class="px-6 py-4 font-semibold">Section</th>
-                            <th class="px-6 py-4 font-semibold">Role</th>
+                            <th class="px-6 py-4 font-semibold">Email</th>
                             <th class="px-6 py-4 font-semibold">Status</th>
                             <th class="px-6 py-4 font-semibold">Enrolled</th>
                         </tr>
@@ -334,7 +369,7 @@ const uploadCsv = async (file) => {
                                 {{ student.section || '—' }}
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-600">
-                                {{ student.role }}
+                                {{ student.email }}
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-600">
                                 <span
@@ -364,11 +399,18 @@ const uploadCsv = async (file) => {
             </div>
         </div>
         <input
-            ref="fileInput"
+            ref="registerFileInput"
             type="file"
             accept=".csv,.xlsx,.xls"
             class="hidden"
-            @change="handleCsvUpload"
+            @change="handleRegisterCsvUpload"
+        />
+        <input
+            ref="updateEmailsFileInput"
+            type="file"
+            accept=".csv"
+            class="hidden"
+            @change="handleUpdateEmailsUpload"
         />
     </div>
 </template>

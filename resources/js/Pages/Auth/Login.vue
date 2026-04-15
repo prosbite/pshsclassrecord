@@ -17,7 +17,7 @@ defineProps({
 });
 
 const form = useForm({
-    username: '',
+    email: '',
     password: '',
     remember: false,
 });
@@ -42,7 +42,7 @@ const submit = () => {
                 <div class="rounded-[32px] bg-white/70 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.25)] backdrop-blur">
                     <div class="flex flex-col items-center gap-1 text-center">
                         <p class="text-xs uppercase tracking-[0.5em] text-slate-400">Class Record</p>
-                        <h1 class="text-2xl font-semibold text-slate-900">Sign in with username</h1>
+                        <h1 class="text-2xl font-semibold text-slate-900">Sign in with email</h1>
                         <p class="text-sm text-slate-500">
                             One secure workspace for advisers, scholars, and admins. Keep classroom data current with a
                             verified PSHS account.
@@ -51,19 +51,19 @@ const submit = () => {
 
                     <form @submit.prevent="submit" class="mt-8 space-y-4">
                         <div>
-                            <InputLabel for="username" value="Username" />
+                            <InputLabel for="email" value="Email" />
 
                             <TextInput
-                                id="username"
-                                type="text"
+                                id="email"
+                                type="email"
                                 class="mt-2 block w-full rounded-[16px] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none"
-                                v-model="form.username"
+                                v-model="form.email"
                                 required
                                 autofocus
-                                autocomplete="username"
+                                autocomplete="email"
                             />
 
-                            <InputError class="mt-2 text-xs text-rose-600" :message="form.errors.username" />
+                            <InputError class="mt-2 text-xs text-rose-600" :message="form.errors.email" />
                         </div>
 
                         <div>
