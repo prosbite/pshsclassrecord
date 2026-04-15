@@ -110,7 +110,7 @@ const toggleCollapse = () => {
             </svg>
           </div>
           <div v-if="!isCollapsed || sidebarOpen" class="font-semibold text-xl tracking-tight text-slate-700">
-            PSHS Class Record
+            Class Record
           </div>
         </div>
 

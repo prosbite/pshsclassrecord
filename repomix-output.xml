@@ -6606,7 +6606,7 @@ const toggleCollapse = () => {
             </svg>
           </div>
           <div v-if="!isCollapsed || sidebarOpen" class="font-semibold text-xl tracking-tight text-slate-700">
-            PSHS Class Record
+            Class Record
           </div>
         </div>
 
@@ -7642,7 +7642,7 @@ const submit = () => {
 
 <template>
     <GuestLayout>
-        <Head title="PSHS Class Record Login" />
+        <Head title="Class Record Login" />
 
         <div class="space-y-10 lg:space-y-12">
             <div>
@@ -7650,7 +7650,7 @@ const submit = () => {
                     Philippine Science High School
                 </p>
                 <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white">
-                    PSHS Class Record
+                    Class Record
                 </h1>
                 <p class="mt-3 max-w-3xl text-sm text-slate-200">
                     Log in with your verified PSHS account to review scholars, update grades, and prepare for advisory
