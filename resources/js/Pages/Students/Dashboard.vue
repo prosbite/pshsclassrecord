@@ -127,6 +127,26 @@ const formatAssessmentValue = (label, value) => {
     return numericValue.toFixed(2);
 };
 
+const formatAssessmentOverallValue = (label, value) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const normalizedLabel = (label ?? '').toString().trim().toLowerCase();
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return value;
+    }
+
+    if (normalizedLabel === 'percentage' || normalizedLabel === 'weighted %') {
+        const percentageValue = Math.abs(numericValue) <= 1 ? numericValue * 100 : numericValue;
+        return `${percentageValue.toFixed(2)}%`;
+    }
+
+    return numericValue.toFixed(2);
+};
+
 const normalizeTentativeLabel = (label) => {
     return (label ?? '').toString().toLowerCase().replace(/\s+/g, '');
 };
@@ -421,7 +441,7 @@ const twoThirdEntry = (assessment) => {
                                             <span class="font-semibold text-slate-900">{{ formatAssessmentValue(item.label, item.value) }}</span>
                                             <span v-if="item.perfectScore"
                                                   class="block text-xs text-slate-400 tracking-wider">
-                                                / {{ formatTwoDecimals(item.perfectScore) }}
+                                                / {{ formatAssessmentOverallValue(item.label, item.perfectScore) }}
                                             </span>
                                         </div>
                                     </div>
