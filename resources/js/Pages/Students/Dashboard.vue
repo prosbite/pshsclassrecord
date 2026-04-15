@@ -103,6 +103,19 @@ const formatUploadedAt = (value) =>
         ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'Date unavailable';
 
+const formatTwoDecimals = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+        return numericValue.toFixed(2);
+    }
+
+    return value;
+};
+
 const normalizeHeaderLabel = (header) => {
     const trimmed = (header ?? '').trim();
     if (!trimmed) return '';
@@ -286,7 +299,7 @@ const twoThirdEntry = (assessment) => {
                     <div class="flex-shrink-0 text-right">
                         <p class="text-xs uppercase tracking-[0.125em] text-slate-400">Quarterly Uploads</p>
                         <p class="mt-1 text-5xl font-semibold tracking-tighter text-slate-900">
-                            {{ hasAssessments ? props.quarterlyAssessments.length : '0' }}
+                            {{ hasAssessments ? props.quarterlyAssessments.length : 0 }}
                         </p>
                         <p class="text-sm text-slate-500">assessments</p>
                     </div>
@@ -357,10 +370,10 @@ const twoThirdEntry = (assessment) => {
                                     >
                                         <span class="font-medium text-slate-700">{{ entryLabel(segment, item.label, entryIndex) }}</span>
                                         <div class="text-right">
-                                            <span class="font-semibold text-slate-900">{{ item.value }}</span>
+                                            <span class="font-semibold text-slate-900">{{ formatTwoDecimals(item.value) }}</span>
                                             <span v-if="item.perfectScore"
                                                   class="block text-xs text-slate-400 tracking-wider">
-                                                / {{ item.perfectScore }}
+                                                / {{ formatTwoDecimals(item.perfectScore) }}
                                             </span>
                                         </div>
                                     </div>
@@ -407,14 +420,14 @@ const twoThirdEntry = (assessment) => {
                                      class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                     <p class="text-xs text-slate-500">Grade Equivalent</p>
                                     <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ finalGradeOverview(selectedQuarterAssessment).ge.value }}
+                                        {{ formatTwoDecimals(finalGradeOverview(selectedQuarterAssessment).ge.value) }}
                                     </p>
                                 </div>
                                 <div v-if="finalGradeOverview(selectedQuarterAssessment).adjectival"
                                      class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                     <p class="text-xs text-slate-500">Adjectival Rating</p>
                                     <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ finalGradeOverview(selectedQuarterAssessment).adjectival.value }}
+                                        {{ formatTwoDecimals(finalGradeOverview(selectedQuarterAssessment).adjectival.value) }}
                                     </p>
                                 </div>
                             </div>
