@@ -31,7 +31,7 @@ const user = computed(() => page.props.auth.user ?? {});
                 Welcome back, {{ user.name ?? 'Scholar' }}
               </h1>
               <p class="mt-1 text-sm text-slate-500">
-                Track your progress and stay aligned with your adviser
+                Track your progress and stay connected with your teacher
               </p>
             </div>
           </div>
