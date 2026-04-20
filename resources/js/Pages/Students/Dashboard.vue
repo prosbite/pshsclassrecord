@@ -526,7 +526,12 @@ watch(
 
         <div class="space-y-8">
             <!-- Info Card -->
-            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-100">
+            <div
+                class="rounded-3xl p-8 shadow-sm border"
+                :class="simulationMode
+                    ? 'bg-emerald-50/50 border-emerald-100'
+                    : 'bg-white border-slate-100'"
+            >
                 <div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <div class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1">
@@ -559,7 +564,12 @@ watch(
             </div>
 
             <!-- Quarter Overview Card -->
-            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-100">
+            <div
+                class="rounded-3xl p-8 shadow-sm border"
+                :class="simulationMode
+                    ? 'bg-emerald-50/50 border-emerald-100'
+                    : 'bg-white border-slate-100'"
+            >
                 <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium uppercase tracking-[0.125em] text-slate-400">Quarterly Overview</p>
                     <button
@@ -685,16 +695,10 @@ watch(
                             <div class="mt-6 grid gap-4 lg:grid-cols-2">
                                 <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Current Quarter</p>
-                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                                        <div class="rounded-2xl bg-white/80 p-4 shadow-sm border border-emerald-100">
-                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Total Weighted Percentage</p>
-                                            <p class="mt-2 text-3xl font-bold text-emerald-700">
-                                                {{ displayedQuarterSummary.twPercent === null ? '—' : `${displayedQuarterSummary.twPercent.toFixed(2)}%` }}
-                                            </p>
-                                        </div>
-                                        <div class="rounded-2xl bg-white/80 p-4 shadow-sm border border-emerald-100">
+                                    <div class="mt-4">
+                                        <div class="rounded-2xl bg-white/80 p-5 shadow-sm border border-emerald-100">
                                             <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
-                                            <p class="mt-2 text-3xl font-bold text-emerald-700">
+                                            <p class="mt-2 text-4xl font-bold text-emerald-700">
                                                 {{ formatGradeEquivalent(displayedQuarterSummary.currentGe) }}
                                             </p>
                                         </div>
@@ -703,17 +707,11 @@ watch(
 
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Previous Quarter</p>
-                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                                        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+                                    <div class="mt-4">
+                                        <div class="rounded-2xl bg-white p-5 shadow-sm border border-slate-200">
                                             <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
-                                            <p class="mt-2 text-3xl font-semibold text-slate-600">
+                                            <p class="mt-2 text-4xl font-semibold text-slate-600">
                                                 {{ formatGradeEquivalent(displayedQuarterSummary.previousGe) }}
-                                            </p>
-                                        </div>
-                                        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Quarter Weight</p>
-                                            <p class="mt-2 text-3xl font-semibold text-slate-600">
-                                                {{ formatGradeEquivalent(displayedQuarterSummary.previousThird) }}
                                             </p>
                                         </div>
                                     </div>
@@ -721,15 +719,15 @@ watch(
                             </div>
 
                             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Final Grade Equivalent</p>
-                                    <p class="mt-2 text-4xl font-bold text-emerald-700">
+                                <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-md ring-1 ring-amber-100">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Final Grade Equivalent</p>
+                                    <p class="mt-2 text-4xl font-bold text-amber-700">
                                         {{ formatGradeEquivalent(displayedQuarterSummary.finalGe) }}
                                     </p>
                                 </div>
-                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Adjectival Equivalent</p>
-                                    <p class="mt-2 text-4xl font-bold text-emerald-700">
+                                <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-md ring-1 ring-amber-100">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Adjectival Equivalent</p>
+                                    <p class="mt-2 text-4xl font-bold text-amber-700">
                                         {{ displayedQuarterSummary.adjectival }}
                                     </p>
                                 </div>
