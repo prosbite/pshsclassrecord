@@ -574,10 +574,10 @@ watch(
                     <p class="text-sm font-medium uppercase tracking-[0.125em] text-slate-400">Quarterly Overview</p>
                     <button
                         type="button"
-                        class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition"
+                        class="rounded-full border border-sky-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition shadow-sm bg-gradient-to-r from-sky-500 via-sky-600 to-cyan-500 text-white hover:from-sky-600 hover:via-sky-700 hover:to-cyan-600"
                         :class="simulationMode
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'"
+                            ? 'ring-2 ring-sky-200 ring-offset-2 ring-offset-white'
+                            : ''"
                         @click="simulationMode = !simulationMode"
                     >
                         {{ simulationMode ? 'Exit Simulation' : 'Simulation Mode' }}
