@@ -1,7 +1,15 @@
 ﻿<script setup>
-import { computed, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
+import {
+    calculatePercentage,
+    calculateWeightedPercentage,
+    formatGradeEquivalent,
+    getAdjectivalEquivalent,
+    getGradeEquivalentFromPercent,
+    getGradeEquivalentFromValue,
+} from '@/Composables/utilities.js';
 
 const props = defineProps({
     student: { type: Object, default: null },
@@ -67,11 +75,6 @@ const selectedQuarterAssessment = computed(() => {
     if (!selectedQuarter.value) return null;
     return (quarterAssessmentsByIndex.value[selectedQuarter.value] ?? [])[0] ?? null;
 });
-
-const isFourthQuarterAssessment = (assessment) => {
-    const quarterIndex = Number(assessment?.quarter?.index ?? assessment?.quarter?.quarter ?? null);
-    return quarterIndex === 4;
-};
 
 // ... (Keep all your other methods unchanged: quarterTitle, getColumns, formatUploadedAt, etc.)
 const quarterTitle = (assessment) => assessment.quarter?.name || (assessment.quarter?.index ? `Quarter ${assessment.quarter.index}` : 'Quarter');
@@ -147,30 +150,34 @@ const formatAssessmentOverallValue = (label, value) => {
     return numericValue.toFixed(2);
 };
 
-const normalizeTentativeLabel = (label) => {
-    return (label ?? '').toString().toLowerCase().replace(/\s+/g, '');
+const parseHeaderMeta = (header) => {
+    const rawLabel = (header ?? '').toString().trim();
+    const tentative = /\(\s*t\s*\)/i.test(rawLabel);
+    const labelWithoutTentative = rawLabel.replace(/\s*\(\s*t\s*\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+    const normalizedLabel = normalizeHeaderLabel(labelWithoutTentative || rawLabel);
+    const normalizedType = normalizedLabel.toLowerCase();
+
+    return {
+        rawLabel,
+        label: normalizedLabel,
+        fieldType: /^t$|^total$/i.test(normalizedType)
+            ? 'total'
+            : /^%$|^percentage$/i.test(normalizedType)
+                ? 'percentage'
+                : /^w%$|^weighted\s?%$/i.test(normalizedType)
+                    ? 'weighted'
+                    : 'score',
+        tentative,
+    };
 };
 
-const isTentativeScore = (assessment, segment, item, entryIndex) => {
-    if (!isFourthQuarterAssessment(assessment)) {
-        return false;
-    }
-
-    const normalizedLabel = normalizeTentativeLabel(item?.label);
-
-    if (segment === 'lt2' && entryIndex === 0) {
+const isTentativeScore = (item) => {
+    const rawLabel = (item?.rawLabel ?? '').toString();
+    if (item?.tentative) {
         return true;
     }
 
-    if (segment === 'aa' && /^aa2\b/.test(normalizedLabel)) {
-        return true;
-    }
-
-    if (segment === 'fa' && /^fa3\b/.test(normalizedLabel)) {
-        return true;
-    }
-
-    return false;
+    return /\(\s*t\s*\)/i.test(rawLabel);
 };
 
 const normalizeHeaderLabel = (header) => {
@@ -236,7 +243,8 @@ const extractSegments = (assessment) => {
         }
 
         const entry = {
-            label: normalizeHeaderLabel(header || `Column ${index + 1}`),
+            key: `${currentSegment ?? 'other'}-${index}-${header ?? `Column ${index + 1}`}`,
+            ...parseHeaderMeta(header || `Column ${index + 1}`),
             value: values[index] ?? '—',
             perfectScore: sanitizePerfectScore(subheaders[index]),
         };
@@ -323,6 +331,193 @@ const twoThirdEntry = (assessment) => {
     if (!assessment) return null;
     return entriesForSegment(assessment, 'fa').find((entry) => isTwoThirdEntry(entry.label)) ?? null;
 };
+
+const simulationMode = ref(false);
+const simulationDraft = reactive({});
+
+const clearSimulationDraft = () => {
+    Object.keys(simulationDraft).forEach((key) => {
+        delete simulationDraft[key];
+    });
+};
+
+const isScoreEntry = (entry) => entry?.fieldType === 'score';
+
+const toNumericValue = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const formatEditableValue = (value) => {
+    const numericValue = toNumericValue(value);
+    return numericValue === null ? '' : String(numericValue);
+};
+
+const getSimulationValue = (entry) => {
+    if (!simulationMode.value || !isScoreEntry(entry)) {
+        return entry.value;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(simulationDraft, entry.key)) {
+        return entry.value;
+    }
+
+    const draftValue = simulationDraft[entry.key];
+    return draftValue === '' || draftValue === null || draftValue === undefined
+        ? 0
+        : draftValue;
+};
+
+const segmentScoreEntries = (assessment, segment) =>
+    entriesForSegment(assessment, segment).filter((entry) => isScoreEntry(entry));
+
+const buildSegmentMetrics = (assessment, segment) => {
+    const scoreEntries = segmentScoreEntries(assessment, segment);
+
+    const score = scoreEntries.reduce((sum, entry) => {
+        const numericValue = toNumericValue(getSimulationValue(entry)) ?? 0;
+        return sum + numericValue;
+    }, 0);
+
+    const perfectScore = scoreEntries.reduce((sum, entry) => {
+        const numericValue = toNumericValue(entry.perfectScore) ?? 0;
+        return sum + numericValue;
+    }, 0);
+
+    const percentage = calculatePercentage(score, perfectScore);
+    const weighted = calculateWeightedPercentage(score, perfectScore);
+
+    return {
+        score,
+        perfectScore,
+        percentage,
+        weighted,
+    };
+};
+
+const displayEntryValue = (assessment, segment, entry) => {
+    if (!simulationMode.value) {
+        return entry.value;
+    }
+
+    const metrics = buildSegmentMetrics(assessment, segment);
+
+    if (entry.fieldType === 'score') {
+        return getSimulationValue(entry);
+    }
+
+    if (entry.fieldType === 'total') {
+        return metrics.score;
+    }
+
+    if (entry.fieldType === 'percentage') {
+        return metrics.percentage;
+    }
+
+    if (entry.fieldType === 'weighted') {
+        return metrics.weighted;
+    }
+
+    return entry.value;
+};
+
+const selectedQuarterResult = computed(() => {
+    const results = [];
+    let previousFinalGe = null;
+
+    quarterOrder.forEach((quarter) => {
+        const assessment = quarterAssessmentsByIndex.value[quarter]?.[0] ?? null;
+        if (!assessment) {
+            results[quarter] = null;
+            return;
+        }
+
+        const isSelected = quarter === selectedQuarter.value;
+        const currentSegmentMetrics = {
+            lt1: buildSegmentMetrics(assessment, 'lt1'),
+            lt2: buildSegmentMetrics(assessment, 'lt2'),
+            aa: buildSegmentMetrics(assessment, 'aa'),
+            fa: buildSegmentMetrics(assessment, 'fa'),
+        };
+
+        const twPercent = ['lt1', 'lt2', 'aa', 'fa']
+            .reduce((sum, segment) => sum + (currentSegmentMetrics[segment].weighted ?? 0), 0);
+
+        const currentGe = getGradeEquivalentFromPercent(twPercent);
+        const currentThird = currentGe === null ? null : currentGe * (2 / 3);
+        const previousGe = previousFinalGe;
+        const previousThird = previousGe === null ? null : previousGe * (1 / 3);
+        const trunc = currentThird !== null && previousThird !== null
+            ? currentThird + previousThird
+            : currentGe;
+        const finalGe = previousThird !== null
+            ? getGradeEquivalentFromValue(trunc)
+            : currentGe;
+
+        const result = {
+            assessment,
+            isSelected,
+            segments: currentSegmentMetrics,
+            twPercent,
+            currentGe,
+            currentThird,
+            previousGe,
+            previousThird,
+            trunc,
+            finalGe,
+            adjectival: getAdjectivalEquivalent(finalGe),
+            previousFinalGe: previousFinalGe,
+        };
+
+        results[quarter] = result;
+        previousFinalGe = finalGe ?? previousFinalGe;
+    });
+
+    return results;
+});
+
+const activeQuarterResult = computed(() => selectedQuarterResult.value[selectedQuarter.value] ?? null);
+const displayedQuarterSummary = computed(() => {
+    if (!simulationMode.value) {
+        return null;
+    }
+
+    return activeQuarterResult.value;
+});
+
+const initializeSimulationDraft = (assessment) => {
+    clearSimulationDraft();
+
+    if (!assessment) {
+        return;
+    }
+
+    const segments = extractSegments(assessment);
+
+    Object.values(segments).flat().forEach((entry) => {
+        if (entry.fieldType === 'score') {
+            simulationDraft[entry.key] = formatEditableValue(entry.value);
+        }
+    });
+};
+
+watch(
+    [selectedQuarterAssessment, simulationMode],
+    ([assessment, enabled]) => {
+        if (enabled) {
+            initializeSimulationDraft(assessment);
+            return;
+        }
+
+        clearSimulationDraft();
+    },
+    { immediate: true }
+);
+
 </script>
 
 <template>
@@ -365,8 +560,18 @@ const twoThirdEntry = (assessment) => {
 
             <!-- Quarter Overview Card -->
             <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-100">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium uppercase tracking-[0.125em] text-slate-400">Quarterly Overview</p>
+                    <button
+                        type="button"
+                        class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition"
+                        :class="simulationMode
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'"
+                        @click="simulationMode = !simulationMode"
+                    >
+                        {{ simulationMode ? 'Exit Simulation' : 'Simulation Mode' }}
+                    </button>
                 </div>
 
                 <!-- Quarter Selector -->
@@ -425,7 +630,7 @@ const twoThirdEntry = (assessment) => {
                                         :key="`${selectedQuarterAssessment.id}-${segment}-${item.label}`"
                                         :class="[
                                             'flex justify-between items-center rounded-2xl px-5 py-4 text-sm transition-colors',
-                                            isTentativeScore(selectedQuarterAssessment, segment, item, entryIndex)
+                                            isTentativeScore(item)
                                                 ? 'border border-amber-300 bg-amber-50/80'
                                                 : 'bg-slate-50',
                                         ]"
@@ -433,12 +638,22 @@ const twoThirdEntry = (assessment) => {
                                         <span class="font-medium text-slate-700">{{ entryLabel(segment, item.label, entryIndex) }}</span>
                                         <div class="text-right">
                                             <span
-                                                v-if="isTentativeScore(selectedQuarterAssessment, segment, item, entryIndex)"
-                                                class="mb-1 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-800"
+                                                v-if="isTentativeScore(item)"
+                                                class="mb-1 inline-flex -translate-x-1 rounded-full bg-amber-200 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-800"
                                             >
                                                 Tentative Score
                                             </span>
-                                            <span class="font-semibold text-slate-900">{{ formatAssessmentValue(item.label, item.value) }}</span>
+                                            <input
+                                                v-if="simulationMode && item.fieldType === 'score'"
+                                                v-model="simulationDraft[item.key]"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                class="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-right text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                                            />
+                                            <span v-else class="font-semibold text-slate-900">
+                                                {{ formatAssessmentValue(item.label, displayEntryValue(selectedQuarterAssessment, segment, item)) }}
+                                            </span>
                                             <span v-if="item.perfectScore"
                                                   class="block text-xs text-slate-400 tracking-wider">
                                                 / {{ formatAssessmentOverallValue(item.label, item.perfectScore) }}
@@ -453,7 +668,75 @@ const twoThirdEntry = (assessment) => {
                         </div>
 
                         <!-- Final Grade Overview -->
-                        <div v-if="hasFinalOverview(selectedQuarterAssessment)"
+                        <div
+                            v-if="simulationMode && displayedQuarterSummary"
+                            class="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-8 shadow-sm"
+                        >
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="uppercase tracking-[0.125em] text-xs text-emerald-600 font-medium">Simulation</p>
+                                    <h4 class="text-2xl font-semibold text-slate-900 mt-1">Live Grade Breakdown</h4>
+                                </div>
+                                <span class="text-xs px-4 py-1.5 bg-white rounded-2xl text-emerald-600 font-medium border border-emerald-100">
+                                    Editable
+                                </span>
+                            </div>
+
+                            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Current Quarter</p>
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div class="rounded-2xl bg-white/80 p-4 shadow-sm border border-emerald-100">
+                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Total Weighted Percentage</p>
+                                            <p class="mt-2 text-3xl font-bold text-emerald-700">
+                                                {{ displayedQuarterSummary.twPercent === null ? '—' : `${displayedQuarterSummary.twPercent.toFixed(2)}%` }}
+                                            </p>
+                                        </div>
+                                        <div class="rounded-2xl bg-white/80 p-4 shadow-sm border border-emerald-100">
+                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
+                                            <p class="mt-2 text-3xl font-bold text-emerald-700">
+                                                {{ formatGradeEquivalent(displayedQuarterSummary.currentGe) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Previous Quarter</p>
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
+                                            <p class="mt-2 text-3xl font-semibold text-slate-600">
+                                                {{ formatGradeEquivalent(displayedQuarterSummary.previousGe) }}
+                                            </p>
+                                        </div>
+                                        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+                                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Quarter Weight</p>
+                                            <p class="mt-2 text-3xl font-semibold text-slate-600">
+                                                {{ formatGradeEquivalent(displayedQuarterSummary.previousThird) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Final Grade Equivalent</p>
+                                    <p class="mt-2 text-4xl font-bold text-emerald-700">
+                                        {{ formatGradeEquivalent(displayedQuarterSummary.finalGe) }}
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-md ring-1 ring-emerald-100">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Adjectival Equivalent</p>
+                                    <p class="mt-2 text-4xl font-bold text-emerald-700">
+                                        {{ displayedQuarterSummary.adjectival }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else-if="hasFinalOverview(selectedQuarterAssessment)"
                              class="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-8 shadow-sm">
                             <div class="flex justify-between items-start">
                                 <div>
@@ -466,24 +749,6 @@ const twoThirdEntry = (assessment) => {
                             </div>
 
                             <div class="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-2">
-                                <!-- <div v-if="twoThirdEntry(selectedQuarterAssessment)"
-                                     class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                                    <p class="text-xs text-slate-500">TW%</p>
-                                    <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ twoThirdEntry(selectedQuarterAssessment).value }}
-                                    </p>
-                                    <span v-if="twoThirdEntry(selectedQuarterAssessment).perfectScore"
-                                          class="block text-xs text-slate-400 tracking-wider mt-1">
-                                        / {{ twoThirdEntry(selectedQuarterAssessment).perfectScore }}
-                                    </span>
-                                </div>
-                                <div v-if="finalGradeOverview(selectedQuarterAssessment).trunc"
-                                     class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                                    <p class="text-xs text-slate-500">Truncated / Final</p>
-                                    <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ finalGradeOverview(selectedQuarterAssessment).trunc.value }}
-                                    </p>
-                                </div> -->
                                 <div v-if="finalGradeOverview(selectedQuarterAssessment).ge"
                                      class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                     <p class="text-xs text-slate-500">Grade Equivalent</p>
