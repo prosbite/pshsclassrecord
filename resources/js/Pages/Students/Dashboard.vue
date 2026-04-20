@@ -426,61 +426,53 @@ const displayEntryValue = (assessment, segment, entry) => {
 };
 
 const selectedQuarterResult = computed(() => {
-    const results = [];
-    let previousFinalGe = null;
+    const assessment = selectedQuarterAssessment.value;
 
-    quarterOrder.forEach((quarter) => {
-        const assessment = quarterAssessmentsByIndex.value[quarter]?.[0] ?? null;
-        if (!assessment) {
-            results[quarter] = null;
-            return;
-        }
+    if (!assessment) {
+        return null;
+    }
 
-        const isSelected = quarter === selectedQuarter.value;
-        const currentSegmentMetrics = {
-            lt1: buildSegmentMetrics(assessment, 'lt1'),
-            lt2: buildSegmentMetrics(assessment, 'lt2'),
-            aa: buildSegmentMetrics(assessment, 'aa'),
-            fa: buildSegmentMetrics(assessment, 'fa'),
-        };
+    const currentSegmentMetrics = {
+        lt1: buildSegmentMetrics(assessment, 'lt1'),
+        lt2: buildSegmentMetrics(assessment, 'lt2'),
+        aa: buildSegmentMetrics(assessment, 'aa'),
+        fa: buildSegmentMetrics(assessment, 'fa'),
+    };
 
-        const twPercent = ['lt1', 'lt2', 'aa', 'fa']
-            .reduce((sum, segment) => sum + (currentSegmentMetrics[segment].weighted ?? 0), 0);
+    const twPercent = ['lt1', 'lt2', 'aa', 'fa']
+        .reduce((sum, segment) => sum + (currentSegmentMetrics[segment].weighted ?? 0), 0);
 
-        const currentGe = getGradeEquivalentFromPercent(twPercent);
-        const currentThird = currentGe === null ? null : currentGe * (2 / 3);
-        const previousGe = previousFinalGe;
-        const previousThird = previousGe === null ? null : previousGe * (1 / 3);
-        const trunc = currentThird !== null && previousThird !== null
-            ? currentThird + previousThird
-            : currentGe;
-        const finalGe = previousThird !== null
-            ? getGradeEquivalentFromValue(trunc)
-            : currentGe;
+    const currentGe = getGradeEquivalentFromPercent(twPercent);
+    const currentThird = currentGe === null ? null : currentGe * (2 / 3);
 
-        const result = {
-            assessment,
-            isSelected,
-            segments: currentSegmentMetrics,
-            twPercent,
-            currentGe,
-            currentThird,
-            previousGe,
-            previousThird,
-            trunc,
-            finalGe,
-            adjectival: getAdjectivalEquivalent(finalGe),
-            previousFinalGe: previousFinalGe,
-        };
+    const previousQuarterAssessment = quarterAssessmentsByIndex.value[selectedQuarter.value - 1]?.[0] ?? null;
+    const previousGe = previousQuarterAssessment
+        ? finalGradeOverview(previousQuarterAssessment).ge?.value ?? null
+        : null;
+    const previousThird = previousGe === null ? null : previousGe * (1 / 3);
 
-        results[quarter] = result;
-        previousFinalGe = finalGe ?? previousFinalGe;
-    });
+    const trunc = currentThird !== null && previousThird !== null
+        ? currentThird + previousThird
+        : currentGe;
+    const finalGe = previousThird !== null
+        ? getGradeEquivalentFromValue(trunc)
+        : currentGe;
 
-    return results;
+    return {
+        assessment,
+        segments: currentSegmentMetrics,
+        twPercent,
+        currentGe,
+        currentThird,
+        previousGe,
+        previousThird,
+        trunc,
+        finalGe,
+        adjectival: getAdjectivalEquivalent(finalGe),
+    };
 });
 
-const activeQuarterResult = computed(() => selectedQuarterResult.value[selectedQuarter.value] ?? null);
+const activeQuarterResult = computed(() => selectedQuarterResult.value);
 const displayedQuarterSummary = computed(() => {
     if (!simulationMode.value) {
         return null;
