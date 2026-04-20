@@ -150,6 +150,33 @@ const formatAssessmentOverallValue = (label, value) => {
     return numericValue.toFixed(2);
 };
 
+const formatPreciseDecimal = (value, digits = 2) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return value;
+    }
+
+    return numericValue.toFixed(digits);
+};
+
+const truncateDecimal = (value, digits = 3) => {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return null;
+    }
+
+    const factor = 10 ** digits;
+    return Math.trunc(numericValue * factor) / factor;
+};
+
 const parseHeaderMeta = (header) => {
     const rawLabel = (header ?? '').toString().trim();
     const tentative = /\(\s*t\s*\)/i.test(rawLabel);
@@ -164,7 +191,10 @@ const parseHeaderMeta = (header) => {
             ? 'total'
             : /^%$|^percentage$/i.test(normalizedType)
                 ? 'percentage'
-                : /^w%$|^weighted\s?%$/i.test(normalizedType)
+                : (
+                    /^w%$|^tw%$|^total\s*weighted\s*%$/i.test(normalizedType)
+                    || /^weighted\s?%$/i.test(normalizedType)
+                )
                     ? 'weighted'
                     : 'score',
         tentative,
@@ -185,7 +215,7 @@ const normalizeHeaderLabel = (header) => {
     if (!trimmed) return '';
     if (/^t$/i.test(trimmed)) return 'Total';
     if (/^%$/i.test(trimmed)) return 'Percentage';
-    if (/^w%$/i.test(trimmed) || /^w\s?%$/i.test(trimmed) || /^weighted\s?%$/i.test(trimmed)) {
+    if (/^w%$/i.test(trimmed) || /^w\s?%$/i.test(trimmed) || /^tw%$/i.test(trimmed) || /^total\s*weighted\s*%$/i.test(trimmed) || /^weighted\s?%$/i.test(trimmed)) {
         return 'Weighted %';
     }
     return trimmed.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
@@ -273,7 +303,24 @@ const detailEntriesForSegment = (assessment, segment) => {
         return entries;
     }
 
-    return entries.filter((entry) => !isTwoThirdEntry(entry.label));
+    let weightedSeen = false;
+
+    return entries.filter((entry) => {
+        if (isTwoThirdEntry(entry.label)) {
+            return false;
+        }
+
+        if (entry.fieldType !== 'weighted') {
+            return true;
+        }
+
+        if (weightedSeen) {
+            return false;
+        }
+
+        weightedSeen = true;
+        return true;
+    });
 };
 
 const finalSegmentEntries = (assessment) => entriesForSegment(assessment, 'final');
@@ -432,6 +479,8 @@ const selectedQuarterResult = computed(() => {
         return null;
     }
 
+    const rawFinalOverview = finalGradeOverview(assessment);
+
     const currentSegmentMetrics = {
         lt1: buildSegmentMetrics(assessment, 'lt1'),
         lt2: buildSegmentMetrics(assessment, 'lt2'),
@@ -451,12 +500,19 @@ const selectedQuarterResult = computed(() => {
         : null;
     const previousThird = previousGe === null ? null : previousGe * (1 / 3);
 
-    const trunc = currentThird !== null && previousThird !== null
+    const truncSource = currentThird !== null && previousThird !== null
         ? currentThird + previousThird
         : currentGe;
-    const finalGe = previousThird !== null
+    const trunc = truncateDecimal(truncSource, 3);
+    const simulatedFinalGe = previousThird !== null
         ? getGradeEquivalentFromValue(trunc)
         : currentGe;
+    const finalGe = simulationMode.value
+        ? simulatedFinalGe
+        : rawFinalOverview.ge?.value ?? simulatedFinalGe;
+    const adjectival = simulationMode.value
+        ? getAdjectivalEquivalent(finalGe)
+        : rawFinalOverview.adjectival?.value ?? getAdjectivalEquivalent(finalGe);
 
     return {
         assessment,
@@ -468,7 +524,7 @@ const selectedQuarterResult = computed(() => {
         previousThird,
         trunc,
         finalGe,
-        adjectival: getAdjectivalEquivalent(finalGe),
+        adjectival,
     };
 });
 
@@ -691,7 +747,7 @@ watch(
                                         <div class="rounded-2xl bg-white/80 p-5 shadow-sm border border-emerald-100">
                                             <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
                                             <p class="mt-2 text-4xl font-bold text-emerald-700">
-                                                {{ formatGradeEquivalent(displayedQuarterSummary.currentGe) }}
+                                                {{ formatPreciseDecimal(displayedQuarterSummary.currentGe) }}
                                             </p>
                                         </div>
                                     </div>
@@ -703,7 +759,7 @@ watch(
                                         <div class="rounded-2xl bg-white p-5 shadow-sm border border-slate-200">
                                             <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Grade Equivalent</p>
                                             <p class="mt-2 text-4xl font-semibold text-slate-600">
-                                                {{ formatGradeEquivalent(displayedQuarterSummary.previousGe) }}
+                                                {{ formatPreciseDecimal(displayedQuarterSummary.previousGe) }}
                                             </p>
                                         </div>
                                     </div>
@@ -714,7 +770,7 @@ watch(
                                 <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-md ring-1 ring-amber-100">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Final Grade Equivalent</p>
                                     <p class="mt-2 text-4xl font-bold text-amber-700">
-                                        {{ formatGradeEquivalent(displayedQuarterSummary.finalGe) }}
+                                        {{ formatPreciseDecimal(displayedQuarterSummary.finalGe) }}
                                     </p>
                                 </div>
                                 <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-md ring-1 ring-amber-100">
@@ -724,6 +780,121 @@ watch(
                                     </p>
                                 </div>
                             </div>
+
+                            <div class="mt-6 rounded-3xl border border-sky-100 bg-white/90 p-5 hidden">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Calculation Breakdown</p>
+                                <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                    <div
+                                        v-for="segment in detailSegments"
+                                        :key="`breakdown-${segment}`"
+                                        class="rounded-2xl border border-sky-100 bg-sky-50/60 p-4"
+                                    >
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-sky-700">
+                                            {{ segmentConfig[segment].title }}
+                                        </p>
+                                        <div class="mt-3 space-y-2">
+                                            <div
+                                                v-for="item in detailEntriesForSegment(selectedQuarterAssessment, segment).filter((entry) => isScoreEntry(entry))"
+                                                :key="`${selectedQuarterAssessment.id}-breakdown-${segment}-${item.key}`"
+                                                class="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm shadow-sm"
+                                            >
+                                                <span class="font-medium text-slate-700">{{ item.label }}</span>
+                                                <span class="font-semibold text-slate-900">
+                                                    {{ formatAssessmentValue(item.label, displayEntryValue(selectedQuarterAssessment, segment, item)) }}
+                                                    <span v-if="item.perfectScore" class="text-slate-400">
+                                                        / {{ formatAssessmentOverallValue(item.label, item.perfectScore) }}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 grid gap-2 text-sm">
+                                            <div class="flex items-center justify-between rounded-xl bg-white px-4 py-2 shadow-sm">
+                                                <span class="text-slate-600">Total</span>
+                                                <span class="font-semibold text-slate-900">
+                                                    {{ formatPreciseDecimal(displayedQuarterSummary.segments[segment].score, 2) }}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center justify-between rounded-xl bg-white px-4 py-2 shadow-sm">
+                                                <span class="text-slate-600">Perfect</span>
+                                                <span class="font-semibold text-slate-900">
+                                                    {{ formatPreciseDecimal(displayedQuarterSummary.segments[segment].perfectScore, 2) }}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center justify-between rounded-xl bg-white px-4 py-2 shadow-sm">
+                                                <span class="text-slate-600">Percentage</span>
+                                                <span class="font-semibold text-slate-900">
+                                                    {{
+                                                        displayedQuarterSummary.segments[segment].percentage === null
+                                                            ? '—'
+                                                            : `${displayedQuarterSummary.segments[segment].percentage}%`
+                                                    }}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center justify-between rounded-xl bg-white px-4 py-2 shadow-sm">
+                                                <span class="text-slate-600">Weighted %</span>
+                                                <span class="font-semibold text-slate-900">
+                                                    {{
+                                                        displayedQuarterSummary.segments[segment].weighted === null
+                                                            ? '—'
+                                                            : `${displayedQuarterSummary.segments[segment].weighted}%`
+                                                    }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">TW%</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ displayedQuarterSummary.twPercent === null ? '—' : `${displayedQuarterSummary.twPercent}%` }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">GE</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.currentGe) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">2/3</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.currentThird) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">G</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.previousGe) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">1/3</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.previousThird) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Trunc</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.trunc, 3) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Final GE</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ formatPreciseDecimal(displayedQuarterSummary.finalGe) }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Adjectival</p>
+                                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                                            {{ displayedQuarterSummary.adjectival }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
 
                         <div v-else-if="hasFinalOverview(selectedQuarterAssessment)"

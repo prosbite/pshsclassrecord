@@ -29,19 +29,21 @@ export const TW_PERCENT_GRADE_EQUIVALENTS = [
     { min: 0, value: 5.0 },
 ];
 
-export const GRADE_EQUIVALENT_SCALE = [
-    1.0,
-    1.25,
-    1.5,
-    1.75,
-    2.0,
-    2.25,
-    2.5,
-    2.75,
-    3.0,
-    4.0,
-    5.0,
+export const GRADE_EQUIVALENT_THRESHOLDS = [
+    { min: 4.501, value: 5.0 },
+    { min: 3.501, value: 4.0 },
+    { min: 2.876, value: 3.0 },
+    { min: 2.626, value: 2.75 },
+    { min: 2.376, value: 2.5 },
+    { min: 2.126, value: 2.25 },
+    { min: 1.876, value: 2.0 },
+    { min: 1.626, value: 1.75 },
+    { min: 1.376, value: 1.5 },
+    { min: 1.126, value: 1.25 },
+    { min: 1.0, value: 1.0 },
 ];
+
+export const GRADE_EQUIVALENT_SCALE = GRADE_EQUIVALENT_THRESHOLDS.map((entry) => entry.value);
 
 export const ADJECTIVAL_EQUIVALENTS = {
     1.0: 'Excellent',
@@ -56,6 +58,8 @@ export const ADJECTIVAL_EQUIVALENTS = {
     4.0: 'Failed on Condition',
     5.0: 'Failed',
 };
+
+const LOOKUP_EPSILON = 1e-10;
 
 const normalizeNumber = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -72,7 +76,7 @@ const pickThresholdValue = (value, thresholds) => {
         return null;
     }
 
-    const match = thresholds.find((entry) => numericValue >= entry.min);
+    const match = thresholds.find((entry) => numericValue + LOOKUP_EPSILON >= entry.min);
     return match ? match.value : null;
 };
 
@@ -81,17 +85,7 @@ export function getGradeEquivalentFromPercent(percent) {
 }
 
 export function getGradeEquivalentFromValue(value) {
-    const numericValue = normalizeNumber(value);
-
-    if (numericValue === null) {
-        return null;
-    }
-
-    const match = [...GRADE_EQUIVALENT_SCALE]
-        .sort((a, b) => b - a)
-        .find((candidate) => numericValue >= candidate);
-
-    return match ?? null;
+    return pickThresholdValue(value, GRADE_EQUIVALENT_THRESHOLDS);
 }
 
 export function getAdjectivalEquivalent(gradeEquivalent) {
