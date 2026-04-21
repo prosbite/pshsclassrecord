@@ -58,13 +58,15 @@ class QuarterlyAssessmentController extends Controller
             'user_id' => ['sometimes', 'exists:users,id'],
         ]);
 
-        if (empty($data['user_id'] ?? null) && $request->user()) {
-            $data['user_id'] = $request->user()->id;
-        }
-
         $quarterlyAssessment->update($data);
 
-        return response()->json($quarterlyAssessment->load($this->loadRelations()));
+        if ($request->expectsJson()) {
+            return response()->json($quarterlyAssessment->load($this->loadRelations()));
+        }
+
+        return redirect()
+            ->route('quarterly-assessments.show', $quarterlyAssessment)
+            ->with('success', 'Quarterly assessment updated');
     }
 
     public function destroy(QuarterlyAssessment $quarterlyAssessment)

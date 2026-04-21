@@ -45,7 +45,7 @@ const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPat
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
 
 const sidebarOpen = ref(false)
-const isCollapsed = ref(false)
+const isCollapsed = ref(true)
 
 // Close sidebar when clicking outside on mobile
 const handleClickOutside = (e) => {
