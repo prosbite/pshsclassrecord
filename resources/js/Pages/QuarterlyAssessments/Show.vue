@@ -4,6 +4,11 @@ import { Link, useForm } from '@inertiajs/vue3';
 import MainAuthLayout from '@/Layouts/MainAuthLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import {
+    buildQuarterlyTablePayload,
+    buildQuarterlyTableView,
+    parseHeaderMeta,
+} from '@/Composables/useQuarterlyAssessmentCalculations.js';
 
 const props = defineProps({
     quarterlyAssessment: {
@@ -32,34 +37,23 @@ const normalizeAssessmentPayload = (payload) => {
     };
 };
 
-const isCalculationHeader = (header) => {
-    const normalized = String(header ?? '')
-        .trim()
-        .replace(/\s+/g, ' ')
-        .toLowerCase();
+const formatCellValue = (cell) => {
+    const value = cell?.displayValue ?? cell?.value;
 
-    return [
-        't',
-        'total',
-        '%',
-        'percentage',
-        'weighted %',
-        'w%',
-        'tw%',
-        'ge',
-        'grade equivalent',
-        'adjectival',
-        'trunc',
-        'truncated',
-    ].includes(normalized);
-};
-
-const isNumericValue = (value) => {
     if (value === null || value === undefined || value === '') {
-        return false;
+        return '-';
     }
 
-    return Number.isFinite(Number(String(value).replace(/,/g, '')));
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return value;
+    }
+
+    if (cell?.fieldType === 'percentage' || cell?.fieldType === 'weighted') {
+        return `${numericValue.toFixed(2)}%`;
+    }
+
+    return numericValue % 1 === 0 ? String(numericValue) : numericValue.toFixed(2);
 };
 
 const rawAssessment = computed(() => props.quarterlyAssessment.assessment ?? null);
@@ -68,6 +62,7 @@ const normalizedAssessment = computed(() => normalizeAssessmentPayload(rawAssess
 const editableHeaders = ref([]);
 const editableRows = ref([]);
 const editMode = ref(false);
+const activeEditor = ref(null);
 
 const form = useForm({
     assessment: {
@@ -81,6 +76,35 @@ const seedEditor = () => {
     editableRows.value = normalizedAssessment.value.rows.map((row) => [...row]);
 };
 
+const isActiveEditor = (key) => activeEditor.value === key;
+
+const activateEditor = (key) => {
+    activeEditor.value = key;
+};
+
+const deactivateEditor = (key) => {
+    if (activeEditor.value === key) {
+        activeEditor.value = null;
+    }
+};
+
+const activeEditorStyle = (key, width) => {
+    if (!isActiveEditor(key)) {
+        return null;
+    }
+
+    return {
+        position: 'absolute',
+        left: '0',
+        top: '50%',
+        width,
+        minWidth: width,
+        maxWidth: 'calc(100vw - 2rem)',
+        transform: 'translateY(-50%)',
+        zIndex: 30,
+    };
+};
+
 watch(
     normalizedAssessment,
     () => {
@@ -91,10 +115,17 @@ watch(
     { immediate: true },
 );
 
-const tableRows = computed(() => normalizedAssessment.value.rows);
-const tableColumns = computed(() => normalizedAssessment.value.headers);
+const tableView = computed(() => buildQuarterlyTableView(editableHeaders.value, editableRows.value));
+const tableRows = computed(() => tableView.value.rows);
+const tableColumns = computed(() => tableView.value.headers.map((header, index) => ({
+    ...parseHeaderMeta(header),
+    header,
+    index,
+})));
 
-const getCellValue = (row, columnIndex) => row?.[columnIndex];
+const getCell = (rowIndex, columnIndex) => tableRows.value[rowIndex]?.cells[columnIndex] ?? null;
+
+const isCalculationHeader = (header) => parseHeaderMeta(header).fieldType !== 'score';
 
 const sectionLabel = computed(() => {
     const section = props.quarterlyAssessment.section;
@@ -141,33 +172,18 @@ const createdAtLabel = computed(() => {
 const startEditing = () => {
     seedEditor();
     editMode.value = true;
+    activeEditor.value = null;
     form.clearErrors();
 };
 
 const cancelEditing = () => {
     editMode.value = false;
+    activeEditor.value = null;
     form.clearErrors();
     seedEditor();
 };
 
-const buildPayloadForSave = () => {
-    const sourceHeaders = normalizedAssessment.value.headers;
-    const sourceRows = normalizedAssessment.value.rows;
-
-    const headers = editableHeaders.value.map((header, index) => (
-        isCalculationHeader(sourceHeaders[index]) ? sourceHeaders[index] : header
-    ));
-
-    const rows = editableRows.value.map((row, rowIndex) => {
-        const sourceRow = sourceRows[rowIndex] ?? [];
-
-        return sourceRow.map((value, columnIndex) => (
-            isCalculationHeader(sourceHeaders[columnIndex]) ? value : (row[columnIndex] ?? '')
-        ));
-    });
-
-    return { headers, rows };
-};
+const buildPayloadForSave = () => buildQuarterlyTablePayload(editableHeaders.value, editableRows.value);
 
 const saveAssessment = () => {
     form.assessment = buildPayloadForSave();
@@ -236,7 +252,7 @@ const saveAssessment = () => {
                         <h2 class="text-lg font-semibold text-slate-900">{{ tableRows.length }} rows</h2>
                     </div>
                     <p class="text-xs uppercase tracking-[0.35em] text-slate-400">
-                        {{ editMode ? 'Calculation columns are locked' : 'View mode' }}
+                        {{ editMode ? 'Calculation columns recalculate live' : 'View mode' }}
                     </p>
                 </div>
 
@@ -244,26 +260,37 @@ const saveAssessment = () => {
                     This quarterly assessment does not contain any rows.
                 </div>
 
-                <div v-else class="overflow-x-auto rounded-2xl border border-slate-100">
+                <div v-else class="overflow-x-auto overflow-y-visible rounded-2xl border border-slate-100">
                     <table class="min-w-full text-sm text-slate-600">
                         <thead class="bg-slate-50 text-[0.65rem] uppercase tracking-[0.35em] text-slate-500">
                             <tr>
                                 <th
                                     v-for="(column, columnIndex) in tableColumns"
-                                    :key="`${columnIndex}-${column}`"
-                                    class="px-4 py-3 text-left"
+                                    :key="`header-${columnIndex}`"
+                                    :class="[
+                                        'relative overflow-visible px-4 py-3 text-left',
+                                        isActiveEditor(`header-${columnIndex}`) ? 'z-20' : '',
+                                    ]"
                                 >
-                                    <div v-if="editMode && !isCalculationHeader(column)" class="space-y-2">
+                                    <div v-if="editMode && !isCalculationHeader(column.header)" class="relative space-y-2 overflow-visible">
                                         <span class="block text-[0.55rem] uppercase tracking-[0.35em] text-slate-400">
                                             Header {{ columnIndex + 1 }}
                                         </span>
                                         <input
                                             v-model="editableHeaders[columnIndex]"
                                             type="text"
-                                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                                            :class="[
+                                                'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition-all duration-150',
+                                                isActiveEditor(`header-${columnIndex}`)
+                                                    ? 'cursor-text shadow-2xl border-sky-400 ring-4 ring-sky-100'
+                                                    : 'relative focus:border-sky-400 focus:ring-2 focus:ring-sky-100',
+                                            ]"
+                                            :style="activeEditorStyle(`header-${columnIndex}`, '28rem')"
+                                            @focus="activateEditor(`header-${columnIndex}`)"
+                                            @blur="deactivateEditor(`header-${columnIndex}`)"
                                         />
                                     </div>
-                                    <span>{{ column }}</span>
+                                    <span v-else>{{ column.header }}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -271,19 +298,30 @@ const saveAssessment = () => {
                             <tr v-for="(row, rowIndex) in tableRows" :key="`row-${rowIndex}`">
                                 <td
                                     v-for="(column, columnIndex) in tableColumns"
-                                    :key="`${rowIndex}-${column}-${columnIndex}`"
-                                    class="px-4 py-3 align-top"
+                                    :key="`cell-${rowIndex}-${columnIndex}`"
+                                    :class="[
+                                        'relative overflow-visible px-4 py-3 align-top',
+                                        isActiveEditor(`cell-${rowIndex}-${columnIndex}`) ? 'z-20' : '',
+                                    ]"
                                 >
-                                    <div v-if="editMode && !isCalculationHeader(column) && isNumericValue(getCellValue(row, columnIndex))">
+                                    <div v-if="editMode && !row.isSubHeader && column.fieldType === 'score'" class="relative overflow-visible">
                                         <input
                                             v-model="editableRows[rowIndex][columnIndex]"
                                             type="number"
                                             step="0.01"
-                                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                                            :class="[
+                                                'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-all duration-150',
+                                                isActiveEditor(`cell-${rowIndex}-${columnIndex}`)
+                                                    ? 'cursor-text shadow-2xl border-sky-400 ring-4 ring-sky-100'
+                                                    : 'relative focus:border-sky-400 focus:ring-2 focus:ring-sky-100',
+                                            ]"
+                                            :style="activeEditorStyle(`cell-${rowIndex}-${columnIndex}`, '24rem')"
+                                            @focus="activateEditor(`cell-${rowIndex}-${columnIndex}`)"
+                                            @blur="deactivateEditor(`cell-${rowIndex}-${columnIndex}`)"
                                         />
                                     </div>
                                     <span v-else class="block min-h-6">
-                                        {{ getCellValue(row, columnIndex) ?? '-' }}
+                                        {{ formatCellValue(getCell(rowIndex, columnIndex)) }}
                                     </span>
                                 </td>
                             </tr>
@@ -292,7 +330,7 @@ const saveAssessment = () => {
                 </div>
 
                 <p v-if="editMode" class="mt-4 text-xs text-slate-500">
-                    You can change header labels and numeric score cells. Locked calculation columns will be preserved as-is.
+                    You can change header labels and numeric score cells. Calculation columns will update automatically.
                 </p>
                 <p v-if="form.errors.assessment" class="mt-3 text-sm text-rose-600">
                     {{ form.errors.assessment }}
