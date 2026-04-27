@@ -7,6 +7,7 @@ use App\Http\Controllers\LearnerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuarterlyAssessmentController;
 use App\Http\Controllers\QuarterlyAssessmentPageController;
+use App\Http\Controllers\StudentImpersonationController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsStudent;
@@ -41,6 +42,8 @@ Route::prefix('admin')
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
         Route::get('/students', [LearnerController::class, 'index'])->name('students');
+        Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
+            ->name('students.impersonate');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');
         Route::post('/students/bulk-update-emails', [EnrollmentController::class, 'bulkUpdateEmails'])->name('students.bulk-update-emails');
         Route::get('/assessments/create', [AssessmentPageController::class, 'create'])->name('assessments.create');
@@ -62,5 +65,9 @@ Route::prefix('admin')
         Route::patch('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentController::class, 'update'])
             ->name('quarterly-assessments.update');
     });
+
+Route::middleware('auth')
+    ->post('/impersonation/stop', [StudentImpersonationController::class, 'destroy'])
+    ->name('impersonation.stop');
 
 require __DIR__.'/auth.php';

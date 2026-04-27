@@ -29,10 +29,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $impersonatorId = $request->session()->get('impersonator_user_id');
+
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'impersonation' => $impersonatorId ? [
+                    'active' => true,
+                    'admin_name' => $request->session()->get('impersonator_user_name'),
+                ] : [
+                    'active' => false,
+                    'admin_name' => null,
+                ],
             ],
         ];
     }
