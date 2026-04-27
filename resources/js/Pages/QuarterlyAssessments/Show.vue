@@ -76,6 +76,9 @@ const seedEditor = () => {
     editableRows.value = normalizedAssessment.value.rows.map((row) => [...row]);
 };
 
+const headersSignature = computed(() => JSON.stringify(editableHeaders.value));
+const rowsSignature = computed(() => JSON.stringify(editableRows.value));
+
 const isActiveEditor = (key) => activeEditor.value === key;
 
 const activateEditor = (key) => {
@@ -115,7 +118,12 @@ watch(
     { immediate: true },
 );
 
-const tableView = computed(() => buildQuarterlyTableView(editableHeaders.value, editableRows.value));
+const tableView = computed(() => {
+    headersSignature.value;
+    rowsSignature.value;
+
+    return buildQuarterlyTableView(editableHeaders.value, editableRows.value);
+});
 const tableRows = computed(() => tableView.value.rows);
 const tableColumns = computed(() => tableView.value.headers.map((header, index) => ({
     ...parseHeaderMeta(header),

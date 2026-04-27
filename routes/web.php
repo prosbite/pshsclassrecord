@@ -57,6 +57,8 @@ Route::prefix('admin')
             ->name('quarterly-assessments.show');
         Route::post('/quarterly-assessments', [QuarterlyAssessmentController::class, 'store'])
             ->name('quarterly-assessments.store');
+        Route::delete('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentController::class, 'destroy'])
+            ->name('quarterly-assessments.destroy');
         Route::patch('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentController::class, 'update'])
             ->name('quarterly-assessments.update');
     });

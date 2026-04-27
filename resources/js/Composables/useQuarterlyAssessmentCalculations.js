@@ -36,11 +36,14 @@ export function parseHeaderMeta(header) {
     const labelWithoutTentative = rawLabel.replace(/\s*\(\s*t\s*\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
     const normalizedLabel = normalizeHeaderLabel(labelWithoutTentative || rawLabel);
     const normalizedType = normalizedLabel.toLowerCase();
+    const isIdentityField = isIdentityLabel(normalizedType);
 
     return {
         rawLabel,
         label: normalizedLabel,
-        fieldType: /^t$|^total$/i.test(normalizedType)
+        fieldType: isIdentityField
+            ? 'identity'
+            : /^t$|^total$/i.test(normalizedType)
             ? 'total'
             : /^%$|^percentage$/i.test(normalizedType)
                 ? 'percentage'
@@ -239,6 +242,29 @@ export function buildQuarterlyTableView(headers, rows) {
         ? rows.map((row) => (Array.isArray(row) ? [...row] : []))
         : [];
 
+    const identityColumns = normalizedHeaders.map((header, columnIndex) => {
+        const headerMeta = parseHeaderMeta(header || `Column ${columnIndex + 1}`);
+        if (headerMeta.fieldType === 'identity') {
+            return true;
+        }
+
+        const sampleValues = normalizedRows
+            .map((row) => row[columnIndex])
+            .map((value) => String(value ?? '').trim())
+            .filter(Boolean);
+
+        if (!sampleValues.length) {
+            return false;
+        }
+
+        const mostlyText = sampleValues.every((value) => !isNumericLike(value));
+        const looksLikeNameColumn = isIdentityLabel(headerMeta.label.toLowerCase())
+            || /name|initial|gender|sex|student/i.test(headerMeta.label);
+        const leftMostTextColumn = columnIndex <= 3;
+
+        return mostlyText && (looksLikeNameColumn || leftMostTextColumn);
+    });
+
     const rowViews = normalizedRows.map((row, rowIndex) => {
         const isSubHeader = isSubHeaderRow(row);
         const subHeaders = resolveSubheaderValues(collectSubHeaders(normalizedRows, rowIndex));
@@ -267,13 +293,16 @@ export function buildQuarterlyTableView(headers, rows) {
                 segment: detectSegment((header ?? '').toLowerCase()) ?? 'other',
                 index: columnIndex,
             };
+            const isIdentityColumn = identityColumns[columnIndex] ?? false;
+            const resolvedFieldType = isIdentityColumn ? 'identity' : cellMeta.fieldType;
 
             const metrics = metricsBySegment[cellMeta.segment] ?? null;
 
             return {
                 ...cellMeta,
+                fieldType: resolvedFieldType,
                 isSubHeader,
-                isCalculation: cellMeta.fieldType !== 'score',
+                isCalculation: resolvedFieldType !== 'score',
                 displayValue: getDisplayValue({ ...cellMeta, isSubHeader }, metrics),
             };
         });
@@ -304,6 +333,24 @@ export function buildQuarterlyTablePayload(headers, rows) {
 
 function trimCell(value) {
     return String(value ?? '').trim();
+}
+
+function isNumericLike(value) {
+    if (value === null || value === undefined || value === '') {
+        return false;
+    }
+
+    return Number.isFinite(Number(String(value).replace(/,/g, '')));
+}
+
+function isIdentityLabel(label) {
+    const normalized = String(label ?? '').trim().toLowerCase();
+
+    if (!normalized) {
+        return false;
+    }
+
+    return /(^|[\s_/-])(family|given|middle|first|last|student|name|initial|gender|sex)([\s_/-]|$)/i.test(normalized);
 }
 
 function toNumericValue(value) {
