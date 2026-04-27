@@ -29,6 +29,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
+        $request->session()->forget([
+            'login_tracker_actor_user_id',
+            'suppress_login_tracking',
+        ]);
+
         $request->authenticate();
 
         $request->session()->regenerate();

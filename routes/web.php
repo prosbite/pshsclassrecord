@@ -4,6 +4,7 @@ use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AssessmentPageController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\LearnerController;
+use App\Http\Controllers\LoginTrackerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuarterlyAssessmentController;
 use App\Http\Controllers\QuarterlyAssessmentPageController;
@@ -42,6 +43,7 @@ Route::prefix('admin')
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
         Route::get('/students', [LearnerController::class, 'index'])->name('students');
+        Route::get('/login-tracker', [LoginTrackerController::class, 'index'])->name('login-tracker.index');
         Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
             ->name('students.impersonate');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');

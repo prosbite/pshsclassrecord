@@ -6,6 +6,7 @@ import {
   UsersIcon,
   FolderIcon,
   ChartBarIcon,
+  ClockIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon
 } from '@heroicons/vue/24/outline'
@@ -41,8 +42,10 @@ const isQuarterlyActive = computed(() =>
 
 const studentsPath = normalizePath(route('students'))
 const assessmentsPath = normalizePath(route('assessments.index'))
+const loginTrackerPath = normalizePath(route('login-tracker.index'))
 const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
+const isLoginTrackerActive = computed(() => currentPath.value.startsWith(loginTrackerPath))
 
 const sidebarOpen = ref(false)
 const isCollapsed = ref(true)
@@ -155,6 +158,15 @@ const toggleCollapse = () => {
         >
           <FolderIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Quarterly CSV</span>
+        </Link>
+
+        <Link
+          :href="route('login-tracker.index')"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isLoginTrackerActive }"
+        >
+          <ClockIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Login Tracker</span>
         </Link>
       </nav>
 

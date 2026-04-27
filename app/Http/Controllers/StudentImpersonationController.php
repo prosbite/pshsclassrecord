@@ -23,6 +23,7 @@ class StudentImpersonationController extends Controller
 
         $request->session()->put('impersonator_user_id', $admin?->id);
         $request->session()->put('impersonator_user_name', $admin?->name);
+        $request->session()->put('login_tracker_actor_user_id', $admin?->id);
 
         Auth::login($studentUser);
         $request->session()->regenerate();
@@ -51,8 +52,10 @@ class StudentImpersonationController extends Controller
             return redirect('/')->with('error', 'Unable to restore the admin session.');
         }
 
+        $request->session()->put('suppress_login_tracking', true);
         Auth::login($impersonator);
         $request->session()->regenerate();
+        $request->session()->forget('suppress_login_tracking');
 
         return redirect()
             ->route('dashboard')
