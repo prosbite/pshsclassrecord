@@ -47,7 +47,7 @@ const submit = () => {
                         <div class="space-y-1">
                             <p class="text-xs uppercase tracking-[0.5em] text-slate-400">SPMSS</p>
                             <h1 class="text-2xl font-semibold text-slate-900 md:text-3xl">Sign in with email</h1>
-                            <p class="text-sm leading-6 text-slate-500">
+                            <p class="text-xs leading-6 text-slate-500">
                                 Student Performance Monitoring and Simulation System
                             </p>
                         </div>
