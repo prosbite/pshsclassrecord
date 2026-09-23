@@ -118,6 +118,19 @@ const assessmentsWithDerived = computed(() =>
 const handleRowClick = (assessment) => {
     router.visit(route('quarterly-assessments.show', assessment.id));
 };
+
+const confirmDelete = (assessment) => {
+    const sectionName = formatSection(assessment);
+    const quarterName = formatQuarter(assessment);
+
+    if (!window.confirm(`Delete ${sectionName} - ${quarterName}? This cannot be undone.`)) {
+        return;
+    }
+
+    router.delete(route('quarterly-assessments.destroy', assessment.id), {
+        preserveScroll: true,
+    });
+};
 </script>
 
 <template>
@@ -160,11 +173,12 @@ const handleRowClick = (assessment) => {
                                 <th class="px-4 py-3">Created</th>
                                 <th class="px-4 py-3">Rows</th>
                                 <th class="px-4 py-3">Columns</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-if="!assessmentsWithDerived.length">
-                                <td colspan="7" class="px-4 py-10 text-center text-xs uppercase tracking-[0.4em] text-slate-400">
+                                <td colspan="8" class="px-4 py-10 text-center text-xs uppercase tracking-[0.4em] text-slate-400">
                                     No quarterly assessments have been saved yet.
                                 </td>
                             </tr>
@@ -184,6 +198,15 @@ const handleRowClick = (assessment) => {
                                     <span class="block max-w-xs truncate text-[0.65rem] text-slate-500">
                                         {{ assessment.columns }}
                                     </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.25em] text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+                                        @click.stop="confirmDelete(assessment)"
+                                    >
+                                        Delete
+                                    </button>
                                 </td>
                             </tr>
                         </tbody>

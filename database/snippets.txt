@@ -1,0 +1,311 @@
+CLASS RECORD APP SNIPPETS
+Generated from the current codebase structure.
+
+==================================================
+SHARED AUTH MODULES
+==================================================
+
+1) Login
+Route:
+```php
+Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
+Route::post('login', [AuthenticatedSessionController::class, 'store']);
+```
+
+2) Register
+Route:
+```php
+Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
+Route::post('register', [RegisteredUserController::class, 'store']);
+```
+
+3) Forgot Password
+Route:
+```php
+Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
+```
+
+4) Reset Password
+Route:
+```php
+Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
+```
+
+5) Email Verification
+Route:
+```php
+Route::get('verify-email', EmailVerificationPromptController::class)->name('verification.notice');
+Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
+    ->middleware(['signed', 'throttle:6,1'])
+    ->name('verification.verify');
+Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+    ->middleware('throttle:6,1')
+    ->name('verification.send');
+```
+
+6) Confirm Password
+Route:
+```php
+Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])->name('password.confirm');
+Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
+```
+
+7) Change Password / Logout
+Route:
+```php
+Route::put('password', [PasswordController::class, 'update'])->name('password.update');
+Route::get('change-password', ChangePasswordController::class)->name('password.change');
+Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+```
+
+==================================================
+TEACHER ACCOUNT MODULES
+==================================================
+
+1) Teacher Dashboard
+Route:
+```php
+Route::prefix('admin')
+    ->middleware(['auth', 'verified', EnsureUserIsAdmin::class])
+    ->group(function () {
+        Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+    });
+```
+
+2) Teacher Profile
+Routes:
+```php
+Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+```
+
+3) Student Directory
+Route:
+```php
+Route::get('/students', [LearnerController::class, 'index'])->name('students');
+```
+Controller render:
+```php
+return Inertia::render('Students/Index', [
+    'enrollments' => $enrollments,
+    'gradeLevels' => $gradeLevels,
+    'filters' => [
+        'grade_level' => $gradeLevelName,
+        'section' => $sectionName,
+        'search' => $search,
+    ],
+]);
+```
+
+4) Login Tracker
+Route:
+```php
+Route::get('/login-tracker', [LoginTrackerController::class, 'index'])->name('login-tracker.index');
+```
+Controller render:
+```php
+return Inertia::render('LoginTracker/Index', [
+    'summary' => [
+        'total_logins' => $totalLogins,
+        'today_logins' => $todayLogins,
+        'week_logins' => $weekLogins,
+        'unique_users' => $uniqueUsers,
+        'admin_assisted_logins' => $adminAssistedLogins,
+    ],
+    'topUsers' => $topUsers,
+    'recentActivities' => $recentActivities,
+]);
+```
+
+5) Student Impersonation
+Routes:
+```php
+Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
+    ->name('students.impersonate');
+Route::post('/impersonation/stop', [StudentImpersonationController::class, 'destroy'])
+    ->name('impersonation.stop');
+```
+Controller store:
+```php
+public function store(Request $request, Enrollment $enrollment): RedirectResponse
+{
+    $admin = $request->user();
+    $studentUser = $enrollment->loadMissing('learner.user')->learner?->user;
+
+    if (! $studentUser) {
+        return redirect()->route('students')->with('error', 'This student does not have an account yet.');
+    }
+
+    $request->session()->put('impersonator_user_id', $admin?->id);
+    Auth::login($studentUser);
+    $request->session()->regenerate();
+
+    return redirect()->route('student.dashboard');
+}
+```
+
+6) Bulk Student Registration
+Route:
+```php
+Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])
+    ->name('students.bulk-register');
+```
+
+7) Bulk Email Update
+Route:
+```php
+Route::post('/students/bulk-update-emails', [EnrollmentController::class, 'bulkUpdateEmails'])
+    ->name('students.bulk-update-emails');
+```
+
+8) Assessment Builder
+Routes:
+```php
+Route::get('/assessments/create', [AssessmentPageController::class, 'create'])->name('assessments.create');
+Route::get('/assessments/section-learners', [AssessmentController::class, 'sectionLearners'])->name('assessments.section-learners');
+Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');
+```
+Controller render:
+```php
+return Inertia::render('Assessments/Create', [
+    'schoolYear' => $schoolYear,
+    'assessmentTypes' => $assessmentTypes,
+    'quarters' => $quarters,
+    'sections' => $sections,
+]);
+```
+
+9) Assessment Records
+Routes:
+```php
+Route::get('/assessments', [AssessmentPageController::class, 'index'])->name('assessments.index');
+Route::get('/assessments/summary', [AssessmentPageController::class, 'summary'])->name('assessments.summary');
+Route::get('/assessments/{assessment}', [AssessmentPageController::class, 'show'])->name('assessments.show');
+```
+Controller render:
+```php
+public function index(Request $request)
+{
+    return Inertia::render('Assessments/Index', $this->loadAssessmentsViewData($request));
+}
+```
+
+10) Quarterly Assessments List
+Route:
+```php
+Route::get('/quarterly-assessments', [QuarterlyAssessmentPageController::class, 'index'])
+    ->name('quarterly-assessments.index');
+```
+Controller render:
+```php
+return Inertia::render('QuarterlyAssessments/Index', [
+    'quarterlyAssessments' => $quarterlyAssessments,
+    'schoolYear' => $schoolYear,
+]);
+```
+
+11) Quarterly Assessment Upload
+Route:
+```php
+Route::get('/quarterly-assessments/upload', [QuarterlyAssessmentPageController::class, 'upload'])
+    ->name('quarterly-assessments.upload');
+```
+Controller render:
+```php
+return Inertia::render('QuarterlyAssessments/Upload', [
+    'schoolYear' => $schoolYear,
+    'sections' => $sections,
+    'quarters' => $quarters,
+]);
+```
+
+12) Quarterly Assessment Detail
+Route:
+```php
+Route::get('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentPageController::class, 'show'])
+    ->name('quarterly-assessments.show');
+```
+
+13) Quarterly Assessment API
+Routes:
+```php
+Route::post('/quarterly-assessments', [QuarterlyAssessmentController::class, 'store'])
+    ->name('quarterly-assessments.store');
+Route::patch('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentController::class, 'update'])
+    ->name('quarterly-assessments.update');
+Route::delete('/quarterly-assessments/{quarterlyAssessment}', [QuarterlyAssessmentController::class, 'destroy'])
+    ->name('quarterly-assessments.destroy');
+```
+Store example:
+```php
+$data = $request->validate([
+    'assessment' => ['required', 'array'],
+    'school_year_id' => ['required', 'exists:school_years,id'],
+    'quarter_id' => ['required', 'exists:quarters,id'],
+    'section_id' => ['required', 'exists:sections,id'],
+]);
+
+$data['user_id'] = $request->user()?->id;
+$assessment = QuarterlyAssessment::create($data);
+```
+
+==================================================
+STUDENT ACCOUNT MODULES
+==================================================
+
+1) Student Dashboard
+Route:
+```php
+Route::middleware(['auth', 'verified', EnsureUserIsStudent::class])
+    ->get('/student/dashboard', [StudentDashboardController::class, 'index'])
+    ->name('student.dashboard');
+```
+Controller render:
+```php
+return Inertia::render('Students/Dashboard', [
+    'student' => $learner ? [
+        'first_name' => $learner->first_name,
+        'middle_name' => $learner->middle_name,
+        'last_name' => $learner->last_name,
+        'email' => $learner->email,
+    ] : null,
+    'section' => $section ? [
+        'id' => $section->id,
+        'section_name' => $section->section_name,
+        'grade_level' => $section->gradeLevel?->grade_level,
+    ] : null,
+    'quarterlyAssessments' => $assessments->values()->all(),
+]);
+```
+
+2) Student View Data Transformation
+Snippet:
+```php
+protected function transformAssessment(QuarterlyAssessment $assessment, Learner $learner): array
+{
+    $studentRow = $this->extractStudentRow($assessment, $learner);
+
+    return [
+        'id' => $assessment->id,
+        'quarter' => [
+            'id' => $assessment->quarter?->id,
+            'name' => $assessment->quarter?->name,
+            'index' => $assessment->quarter?->quarter,
+        ],
+        'studentRow' => $studentRow,
+        'hasPayload' => ! empty($assessment->assessment),
+    ];
+}
+```
+
+==================================================
+NOTES
+==================================================
+
+- Teacher account modules live under the `/admin` prefix and use `EnsureUserIsAdmin`.
+- Student account access is limited by `EnsureUserIsStudent`.
+- Shared auth pages are used by both roles.
+- The snippets above are intentionally short and representative, so they are easy to reuse in docs or demos.

@@ -116,6 +116,7 @@ const structuredStudents = computed(() => {
             grade_level: gradeLevel.grade_level ?? '',
             section: section.section_name ?? '',
             created_at: enrollment.created_at,
+            can_login: Boolean(learner.user?.id),
         };
     });
 });
@@ -225,6 +226,16 @@ const uploadCsv = async (file, endpoint, inProgressRef, feedbackRef) => {
     } finally {
         inProgressRef.value = false;
     }
+};
+
+const loginAsStudent = (student) => {
+    if (!student?.can_login) {
+        return;
+    }
+
+    router.post(route('students.impersonate', student.id), {}, {
+        preserveScroll: true,
+    });
 };
 </script>
 
@@ -345,6 +356,7 @@ const uploadCsv = async (file, endpoint, inProgressRef, feedbackRef) => {
                             <th class="px-6 py-4 font-semibold">Email</th>
                             <th class="px-6 py-4 font-semibold">Status</th>
                             <th class="px-6 py-4 font-semibold">Enrolled</th>
+                            <th class="px-6 py-4 font-semibold text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -385,6 +397,16 @@ const uploadCsv = async (file, endpoint, inProgressRef, feedbackRef) => {
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-500">
                                 {{ formatDate(student.created_at) }}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    :disabled="!student.can_login"
+                                    @click.stop="loginAsStudent(student)"
+                                >
+                                    {{ student.can_login ? 'Login' : 'No Account' }}
+                                </button>
                             </td>
                         </tr>
                     </tbody>

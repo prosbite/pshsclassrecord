@@ -69,10 +69,16 @@ class QuarterlyAssessmentController extends Controller
             ->with('success', 'Quarterly assessment updated');
     }
 
-    public function destroy(QuarterlyAssessment $quarterlyAssessment)
+    public function destroy(Request $request, QuarterlyAssessment $quarterlyAssessment)
     {
         $quarterlyAssessment->delete();
 
-        return response()->json(null, 204);
+        if ($request->expectsJson()) {
+            return response()->json(null, 204);
+        }
+
+        return redirect()
+            ->route('quarterly-assessments.index')
+            ->with('success', 'Quarterly assessment deleted');
     }
 }

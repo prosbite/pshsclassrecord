@@ -1,11 +1,12 @@
-﻿<script setup>
+<script setup>
 import { computed } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user ?? {});
+const impersonation = computed(() => page.props.auth.impersonation ?? { active: false, admin_name: null });
 </script>
 
 <template>
@@ -20,8 +21,8 @@ const user = computed(() => page.props.auth.user ?? {});
           <!-- Left: Branding & Welcome -->
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-3">
-              <div class="h-7 w-7 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center">
-                <span class="text-white text-[15px] font-semibold tracking-tighter">S</span>
+              <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600">
+                <span class="text-[15px] font-semibold tracking-tighter text-white">S</span>
               </div>
               <p class="text-xs font-medium uppercase tracking-[0.125em] text-slate-400">Student Portal</p>
             </div>
@@ -45,7 +46,7 @@ const user = computed(() => page.props.auth.user ?? {});
               >
                 <div class="flex items-center gap-2.5">
                   <!-- Optional avatar circle -->
-                  <div class="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-medium text-sm ring-2 ring-white">
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-medium text-slate-600 ring-2 ring-white">
                     {{ user.name ? user.name.charAt(0).toUpperCase() : 'S' }}
                   </div>
                   <span class="font-semibold">{{ user.name ?? 'Scholar' }}</span>
@@ -80,6 +81,23 @@ const user = computed(() => page.props.auth.user ?? {});
         </div>
       </div>
     </header>
+
+    <div v-if="impersonation.active" class="border-b border-amber-200 bg-amber-50">
+      <div class="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm text-amber-900">
+          Admin access is active as <span class="font-semibold">{{ user.name ?? 'Scholar' }}</span>
+          <span v-if="impersonation.admin_name">on behalf of {{ impersonation.admin_name }}</span>.
+        </p>
+        <Link
+          :href="route('impersonation.stop')"
+          method="post"
+          as="button"
+          class="inline-flex items-center justify-center rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
+        >
+          Return to admin
+        </Link>
+      </div>
+    </div>
 
     <!-- Main Content -->
     <main class="mx-auto max-w-6xl px-6 py-10 lg:py-14">
