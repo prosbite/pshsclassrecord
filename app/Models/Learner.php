@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use Database\Factories\LearnerFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-
 
 class Learner extends Model
 {
+    /** @use HasFactory<LearnerFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'first_name',
         'middle_name',
@@ -39,7 +41,7 @@ class Learner extends Model
     public function assessments(): BelongsToMany
     {
         return $this->belongsToMany(Assessment::class, 'assessment_learners')
-            ->withPivot('score')
+            ->withPivot('score', 'tentative')
             ->withTimestamps();
     }
 

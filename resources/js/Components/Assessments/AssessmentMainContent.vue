@@ -284,19 +284,19 @@ const goToAssessment = (assessment) => {
                                 tabindex="0"
                             >
                                 <td class="px-6 py-4 font-semibold text-slate-900">
-                                    <div>{{ assessment.title || assessment.assessmentType?.name || 'Assessment' }}</div>
+                                    <div>{{ assessment.title || assessment.assessment_type?.name || 'Assessment' }}</div>
                                     <span class="text-xs text-slate-500">
                                         {{ assessment.section?.section_name || 'General' }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-600">
                                     <div class="flex items-center gap-2">
-                                        <span>{{ assessment.assessmentType?.name || '—' }}</span>
+                                        <span>{{ assessment.assessment_type?.name || '—' }}</span>
                                         <span
-                                            v-if="assessment.assessmentType?.percentage"
+                                            v-if="assessment.assessment_type?.percentage"
                                             class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
                                         >
-                                            {{ assessment.assessmentType?.percentage }}%
+                                            {{ assessment.assessment_type?.percentage }}%
                                         </span>
                                     </div>
                                     <div class="text-xs text-slate-400">

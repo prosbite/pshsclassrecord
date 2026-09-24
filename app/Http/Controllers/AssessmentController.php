@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AssessmentRequest;
 use App\Models\Assessment;
 use App\Models\Enrollment;
 use App\Models\SchoolYear;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class AssessmentController extends Controller
 {
@@ -23,28 +25,11 @@ class AssessmentController extends Controller
         return response()->json($assessments);
     }
 
-    public function store(Request $request)
+    public function store(AssessmentRequest $request)
     {
-        $data = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'assessment_type_id' => ['required', 'exists:assessment_types,id'],
-            'school_year_id' => ['required', 'exists:school_years,id'],
-            'quarter_id' => ['required', 'exists:quarters,id'],
-            'section_id' => ['required', 'exists:sections,id'],
-            'user_id' => ['nullable', 'exists:users,id'],
-            'perfect_score' => ['nullable', 'integer', 'min:0'],
-            'assessment_date' => ['required', 'date'],
-            'learner_scores' => ['nullable', 'array'],
-            'learner_scores.*.learner_id' => ['required', 'exists:learners,id'],
-            'learner_scores.*.score' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $data['user_id'] = $data['user_id'] ?? $request->user()?->id;
+        $data = $request->validated();
+        $data['user_id'] = $request->user()->id;
         $data['perfect_score'] = $data['perfect_score'] ?? 100;
-
-        if (! $data['user_id']) {
-            return response()->json(['error' => 'Unable to resolve user'], 422);
-        }
 
         $learnerScores = collect($data['learner_scores'] ?? []);
         unset($data['learner_scores']);
@@ -52,13 +37,7 @@ class AssessmentController extends Controller
         $assessment = Assessment::create($data);
 
         if ($learnerScores->isNotEmpty()) {
-            $pivot = $learnerScores->mapWithKeys(fn ($item) => [
-                $item['learner_id'] => [
-                    'score' => $item['score'] ?? 0,
-                ],
-            ]);
-
-            $assessment->learners()->sync($pivot->toArray());
+            $assessment->learners()->sync($this->pivotPayload($learnerScores));
         }
 
         $assessment->load($this->loadRelations());
@@ -100,31 +79,53 @@ class AssessmentController extends Controller
         return response()->json($assessment->load($this->loadRelations()));
     }
 
-    public function update(Request $request, Assessment $assessment)
+    public function update(AssessmentRequest $request, Assessment $assessment)
     {
-        $data = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'assessment_type_id' => ['sometimes', 'exists:assessment_types,id'],
-            'school_year_id' => ['sometimes', 'exists:school_years,id'],
-            'quarter_id' => ['sometimes', 'exists:quarters,id'],
-            'section_id' => ['sometimes', 'exists:sections,id'],
-            'user_id' => ['sometimes', 'exists:users,id'],
-            'perfect_score' => ['sometimes', 'integer', 'min:0'],
-        ]);
+        $data = $request->validated();
+        $learnerScores = $data['learner_scores'] ?? null;
+        unset($data['learner_scores']);
 
-        if (empty($data['user_id'] ?? null) && $request->user()) {
-            $data['user_id'] = $request->user()->id;
-        }
+        $data['perfect_score'] = $data['perfect_score'] ?? 100;
 
         $assessment->update($data);
 
-        return response()->json($assessment->load($this->loadRelations()));
+        // Non-destructive: an empty payload is a no-op, and learners outside the
+        // submitted set keep their existing scores instead of being detached.
+        if (is_array($learnerScores) && $learnerScores !== []) {
+            $assessment->learners()->syncWithoutDetaching($this->pivotPayload(collect($learnerScores)));
+        }
+
+        $assessment->load($this->loadRelations());
+
+        if ($request->wantsJson()) {
+            return response()->json($assessment);
+        }
+
+        return redirect()->route('assessments.index')->with('success', 'Assessment updated');
     }
 
-    public function destroy(Assessment $assessment)
+    public function destroy(Request $request, Assessment $assessment)
     {
         $assessment->delete();
 
-        return response()->json(null, 204);
+        if ($request->wantsJson()) {
+            return response()->json(null, 204);
+        }
+
+        return redirect()->route('assessments.index')->with('success', 'Assessment deleted');
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $learnerScores
+     * @return array<int, array<string, mixed>>
+     */
+    private function pivotPayload($learnerScores): array
+    {
+        return $learnerScores->mapWithKeys(fn ($item) => [
+            $item['learner_id'] => [
+                'score' => $item['score'] ?? 0,
+                'tentative' => (bool) ($item['tentative'] ?? false),
+            ],
+        ])->toArray();
     }
 }
