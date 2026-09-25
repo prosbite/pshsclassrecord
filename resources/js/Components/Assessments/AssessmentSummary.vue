@@ -1,6 +1,10 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
+import {
+    SEGMENT_LABELS,
+    buildSummaryRows,
+} from '@/Composables/assessmentGrading.js';
 
 const props = defineProps({
     assessments: {
@@ -17,11 +21,19 @@ const props = defineProps({
     },
     section: {
         type: Object,
-        default: 'all',
+        default: null,
     },
     sectionFilter: {
         type: String,
         default: 'all',
+    },
+    quarters: {
+        type: Array,
+        default: () => [],
+    },
+    selectedQuarterId: {
+        type: [String, Number],
+        default: null,
     },
 });
 
@@ -49,7 +61,7 @@ watch(
             selectedSection.value = 'all';
         }
     },
-    { immediate: true }
+    { immediate: true },
 );
 
 watch(
@@ -60,7 +72,7 @@ watch(
         if (normalized !== selectedSection.value) {
             selectedSection.value = normalized;
         }
-    }
+    },
 );
 
 watch(selectedSection, (value) => {
@@ -82,134 +94,251 @@ watch(selectedSection, (value) => {
     });
 });
 
-const filteredAssessments = computed(() => {
-    const selection = selectedSection.value;
+const quarterOptions = computed(() =>
+    props.quarters.map((quarter) => ({
+        id: String(quarter.id),
+        number: quarter.quarter,
+        label: quarter.quarter ? `Quarter ${quarter.quarter}` : 'Quarter',
+        hasAssessments: props.assessments.some(
+            (assessment) => String(assessment.quarter?.id) === String(quarter.id),
+        ),
+    })),
+);
 
-    if (!selection || selection === 'all') {
-        return []
+const selectedQuarter = ref(null);
+
+const resolveInitialQuarter = () => {
+    if (props.selectedQuarterId !== null && props.selectedQuarterId !== undefined) {
+        const requested = quarterOptions.value.find(
+            (quarter) => quarter.id === String(props.selectedQuarterId),
+        );
+
+        if (requested?.hasAssessments) {
+            return requested.id;
+        }
     }
 
-    if (selection === 'unassigned') {
-        return []
+    return quarterOptions.value.find((quarter) => quarter.hasAssessments)?.id
+        ?? quarterOptions.value[0]?.id
+        ?? null;
+};
+
+watch(
+    quarterOptions,
+    (options) => {
+        if (!options.some((quarter) => quarter.id === selectedQuarter.value)) {
+            selectedQuarter.value = resolveInitialQuarter();
+        }
+    },
+    { immediate: true },
+);
+
+const selectedQuarterNumber = computed(() => {
+    const match = quarterOptions.value.find((quarter) => quarter.id === selectedQuarter.value);
+    return match?.number ?? null;
+});
+
+const selectedQuarterLabel = computed(
+    () => quarterOptions.value.find((quarter) => quarter.id === selectedQuarter.value)?.label ?? 'Quarter',
+);
+
+const learners = computed(() =>
+    (props.section?.enrollments ?? [])
+        .map((enrollment) => enrollment.learner ?? { id: enrollment.learner_id })
+        .filter((learner) => learner?.id),
+);
+
+const quarterAssessments = computed(() =>
+    props.assessments.filter(
+        (assessment) => String(assessment.quarter?.id) === String(selectedQuarter.value),
+    ),
+);
+
+const previousQuarterAssessments = computed(() => {
+    if (selectedQuarterNumber.value === null) {
+        return [];
     }
 
-    return props.assessments.filter((assessment) => String(assessment.section?.id) === selection);
+    const previous = quarterOptions.value.find(
+        (quarter) => quarter.number === selectedQuarterNumber.value - 1,
+    );
+
+    if (!previous) {
+        return [];
+    }
+
+    return props.assessments.filter(
+        (assessment) => String(assessment.quarter?.id) === previous.id,
+    );
 });
 
-// const tableRows = computed(() => {
-//     return filteredAssessments.value.map((assessment) => {
-//         const learners = assessment.learners_count ?? 0;
-//         const base = Math.max(learners, 1);
-//         const percentage = assessment.assessmentType?.percentage ?? null;
-//         const percText = percentage !== null ? `${percentage}%` : '—';
-//         const weighted = percentage !== null ? `${(percentage * 0.25).toFixed(2)}%` : '—';
-//         const gradeLevel = assessment.section?.grade_level?.grade_level || '—';
-//         const teacherName = assessment.user?.name ?? 'Unassigned';
-//         const sectionName = assessment.section?.section_name || 'General';
-//         const initials = (teacherName && teacherName[0]) || '—';
-//         const adjectives =
-//             percentage === null
-//                 ? 'Needs data'
-//                 : percentage >= 95
-//                     ? 'Outstanding'
-//                     : percentage >= 85
-//                         ? 'Very Satisfactory'
-//                         : percentage >= 70
-//                             ? 'Satisfactory'
-//                             : 'Needs Improvement';
+const tableData = computed(() =>
+    buildSummaryRows({
+        assessments: quarterAssessments.value,
+        learners: learners.value,
+        previousQuarterAssessments: previousQuarterAssessments.value,
+    }),
+);
 
-//         const computedNumber = (factor) => Math.round(base * factor);
-//         const maybeNumber = (value, fallback = '—') => (value || value === 0 ? value : fallback);
+const SEGMENT_KEYS = ['lt1', 'lt2', 'aa', 'fa'];
 
-//         return {
-//             id: assessment.id,
-//             familyName: sectionName,
-//             givenName: teacherName,
-//             middleInitial: initials,
-//             lt1: computedNumber(0.8),
-//             lt1Total: computedNumber(1),
-//             lt1Percent: percText,
-//             lt1Weight: weighted,
-//             lt2: computedNumber(0.75),
-//             lt2Total: computedNumber(0.95),
-//             lt2Percent: percText,
-//             lt2Weight: weighted,
-//             aa1: computedNumber(0.6),
-//             aa2: computedNumber(0.4),
-//             aaTotal: computedNumber(1),
-//             aaPercent: percText,
-//             aaWeight: weighted,
-//             fa1: computedNumber(0.25),
-//             fa2: computedNumber(0.25),
-//             fa3: computedNumber(0.25),
-//             faTotal: computedNumber(0.75),
-//             faPercent: percText,
-//             faWeight: weighted,
-//             twPercent: percText,
-//             ge: gradeLevel,
-//             twoThirds: maybeNumber(Math.round(base * 0.67)),
-//             gScore: maybeNumber(percentage ? (percentage * 0.7).toFixed(2) : null),
-//             oneThird: maybeNumber(Math.round(base * 0.33)),
-//             trunc: maybeNumber(Math.trunc(percentage ?? 0)),
-//             finalGe: gradeLevel,
-//             adjectival: adjectives,
-//         };
-//     });
-// });
-const tableRows = computed(() => {
-   const longTests = props.assessments.filter(a => a.assessment_type.name === 'Long Test');
-   const alternativeAssessments = props.assessments.filter(a => a.assessment_type.name === 'Alternative Assessment');
-   const formativeAssessments = props.assessments.filter(a => a.assessment_type.name === 'Formative Assessment');
-   const students = props.section?.enrollments ?? []
+const SUMMARY_COLUMNS = [
+    { key: 'tw', type: 'tw', label: 'TW%' },
+    { key: 'ge', type: 'ge', label: 'GE' },
+    { key: 'twoThirds', type: 'twoThirds', label: '2/3' },
+    { key: 'prevGe', type: 'prevGe', label: 'G' },
+    { key: 'oneThird', type: 'oneThird', label: '1/3' },
+    { key: 'trunc', type: 'trunc', label: 'Trunc' },
+    { key: 'finalGe', type: 'finalGe', label: 'GE' },
+];
 
-   const rows = students.map(enrollment => {
-       const learner = enrollment.learner;
-       const row = {
-            id: enrollment.id,
-            familyName: learner.last_name,
-            givenName: learner.first_name,
-            middleInitial: learner.middle_name ? learner.middle_name[0] : '',
-            lt1: {
-                score: longTests[0]?.learners?.find(s => s.id === learner.id)?.pivot.score ?? '—',
-                perfectScore: longTests[0]?.perfect_score ?? '—',
-                percent: longTests[0]?.scores?.find(s => s.learner_id === learner.id)?.percent ?? '—',
-            },
-            lt2: {
-                score: longTests[1]?.learners?.find(s => s.id === learner.id)?.pivot.score ?? '—',
-                perfectScore: longTests[1]?.perfect_score ?? '—',
-                percent: longTests[1]?.scores?.find(s => s.learner_id === learner.id)?.percent ?? '—',
-            },
-            alternativeAssessments: alternativeAssessments.map(aa => aa.learners?.find(s => s.id === learner.id)?.pivot.score ?? '—'),
-            formativeAssessments: formativeAssessments.map(fa => fa.learners?.find(s => s.id === learner.id)?.pivot.score ?? '—'),
-       };
-       return row;
-   });
-   return {rows, longTests, alternativeAssessments, formativeAssessments};
+const segmentScoreLabels = { lt1: 'LT1', lt2: 'LT2', aa: 'AA', fa: 'FA' };
+
+const segmentColumns = computed(() => {
+    const grouped = tableData.value.segments ?? {};
+    const columns = [];
+
+    SEGMENT_KEYS.forEach((segment) => {
+        const assessments = segment === 'lt1'
+            ? (grouped.lt1 ? [grouped.lt1] : [])
+            : segment === 'lt2'
+                ? (grouped.lt2 ? [grouped.lt2] : [])
+                : (grouped[segment] ?? []);
+
+        assessments.forEach((assessment, index) => {
+            columns.push({
+                key: `${segment}-score-${assessment.id}`,
+                segment,
+                type: 'score',
+                assessmentId: assessment.id,
+                label: assessments.length > 1
+                    ? `${segmentScoreLabels[segment]}${index + 1}`
+                    : segmentScoreLabels[segment],
+                perfectScore: assessment.perfect_score,
+            });
+        });
+
+        columns.push({ key: `${segment}-total`, segment, type: 'total', label: 'T' });
+        columns.push({ key: `${segment}-percent`, segment, type: 'percentage', label: '%' });
+        columns.push({ key: `${segment}-weighted`, segment, type: 'weighted', label: 'W%', weighted: true });
+    });
+
+    return columns;
 });
-const schoolYear = computed(() => props.schoolYear);
-const totalPerfectScore = computed(() => {
-    const lt1Perfect = tableRows.value.longTests[0]?.perfect_score || 0;
-    const lt2Perfect = tableRows.value.longTests[1]?.perfect_score || 0;
-    const aaPerfect = tableRows.value.alternativeAssessments.reduce((sum, aa) => sum + (aa.perfect_score || 0), 0);
-    const faPerfect = tableRows.value.formativeAssessments.reduce((sum, fa) => sum + (fa.perfect_score || 0), 0);
-    return { lt1Perfect, lt2Perfect, aaPerfect, faPerfect, total: lt1Perfect + lt2Perfect + aaPerfect + faPerfect };
+
+const bodyColumns = computed(() => [...segmentColumns.value, ...SUMMARY_COLUMNS]);
+
+const segmentGroupSpans = computed(() => {
+    const spans = {};
+
+    segmentColumns.value.forEach((column) => {
+        spans[column.segment] = (spans[column.segment] ?? 0) + 1;
+    });
+
+    return spans;
 });
-const totalScore = (scores) => {
-    return scores.reduce((sum, score) => sum + parseFloat(score || 0), 0);
-}
+
+const hasSection = computed(() => Boolean(props.section));
+
+const formatNumber = (value, digits = 2) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue.toFixed(digits) : '—';
+};
+
+const formatPercent = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? `${numericValue.toFixed(2)}%` : '—';
+};
+
+const cellValue = (row, column) => {
+    if (column.type === 'score') {
+        return formatNumber(row.scores?.[column.assessmentId]);
+    }
+
+    const metrics = row.segments?.[column.segment];
+
+    if (column.type === 'total') {
+        return formatNumber(metrics?.score);
+    }
+
+    if (column.type === 'percentage') {
+        return formatPercent(metrics?.percentage);
+    }
+
+    if (column.type === 'weighted') {
+        return formatPercent(metrics?.weighted);
+    }
+
+    if (column.type === 'tw') {
+        return formatPercent(row.summary?.twPercent);
+    }
+
+    if (column.type === 'ge') {
+        return formatNumber(row.summary?.currentGe);
+    }
+
+    if (column.type === 'twoThirds') {
+        return formatNumber(row.summary?.currentThird);
+    }
+
+    if (column.type === 'prevGe') {
+        return formatNumber(row.summary?.previousGe);
+    }
+
+    if (column.type === 'oneThird') {
+        return formatNumber(row.summary?.previousThird);
+    }
+
+    if (column.type === 'trunc') {
+        return formatNumber(row.summary?.trunc, 3);
+    }
+
+    if (column.type === 'finalGe') {
+        return formatNumber(row.summary?.finalGe);
+    }
+
+    return '—';
+};
+
+const isTentative = (row, column) =>
+    column.type === 'score' && Boolean(row.tentatives?.[column.assessmentId]);
+
+const hasAnyTentative = computed(() => {
+    const currentIds = Object.values(tableData.value.segments ?? {})
+        .flat()
+        .filter(Boolean)
+        .map((assessment) => assessment.id);
+
+    return tableData.value.rows.some((row) =>
+        currentIds.some((id) => Boolean(row.tentatives?.[id])));
+});
+
+const learnerName = (learner) => ({
+    familyName: learner.last_name ?? '',
+    givenName: learner.first_name ?? '',
+    middleInitial: learner.middle_name ? `${learner.middle_name.trim().charAt(0)}.` : '',
+});
 </script>
 
 <template>
     <div class="overflow-hidden rounded-3xl bg-white shadow-lg">
-        <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+        <div class="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Assessment summary</p>
                 <h3 class="text-lg font-semibold text-slate-900">Quarterly breakdown</h3>
-            </div>
-            <div class="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                 <span class="text-xs text-slate-500">
-                    {{ filteredAssessments.length }} assessments · {{ schoolYear ? schoolYear.year_start + '-' + schoolYear.year_end : 'No school year' }}
+                    {{ quarterAssessments.length }} assessments · {{ schoolYear ? schoolYear.year_start + '-' + schoolYear.year_end : 'No school year' }}
                 </span>
+            </div>
+            <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 <div class="flex items-center gap-2">
                     <label for="summary-section-filter" class="sr-only">Filter summary by section</label>
                     <select
@@ -226,9 +355,33 @@ const totalScore = (scores) => {
                         </option>
                     </select>
                 </div>
+                <div v-if="hasSection" class="flex flex-wrap gap-2">
+                    <button
+                        v-for="quarter in quarterOptions"
+                        :key="quarter.id"
+                        type="button"
+                        class="rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-widest transition-all focus:outline-none"
+                        :class="[
+                            quarter.id === selectedQuarter
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                            !quarter.hasAssessments && 'opacity-40 cursor-not-allowed',
+                        ]"
+                        :disabled="!quarter.hasAssessments"
+                        @click="selectedQuarter = quarter.id"
+                    >
+                        {{ quarter.label }}
+                    </button>
+                </div>
             </div>
         </div>
-        <div class="px-6 pb-4">
+
+        <div v-if="!hasSection" class="px-6 py-16 text-center">
+            <p class="text-slate-400">Select a section to view its quarterly breakdown.</p>
+            <p class="mt-2 text-sm text-slate-500">A summary needs a concrete section; "All sections" and "Unassigned" are not supported here.</p>
+        </div>
+
+        <div v-else class="px-6 pb-4">
             <div class="overflow-x-auto">
                 <div class="inline-block min-w-full">
                     <table class="min-w-full divide-y divide-slate-100 text-xs text-slate-600 table-fixed">
@@ -237,153 +390,112 @@ const totalScore = (scores) => {
                                 <th rowspan="2" colspan="3" class="px-4 py-3 text-left font-semibold border-r border-slate-200 w-40 sticky left-0 z-10 bg-white">
                                     Mathematics 6
                                 </th>
-                                <th colspan="3" class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    Long Test 1
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    25%
-                                </th>
-                                <th colspan="3" class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    Long Test 2
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    25%
-                                </th>
-                                <th colspan="4" class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    Alternative Assessments
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    25%
-                                </th>
-                                <th colspan="5" class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    Formative Assessments
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200">
-                                    25%
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200">
+                                <template v-for="segment in SEGMENT_KEYS" :key="segment">
+                                    <th
+                                        v-if="segmentGroupSpans[segment]"
+                                        :colspan="segmentGroupSpans[segment] - 1"
+                                        class="px-4 py-3 text-center font-semibold border-r border-slate-200"
+                                    >
+                                        {{ SEGMENT_LABELS[segment] }}
+                                    </th>
+                                    <th
+                                        v-if="segmentGroupSpans[segment]"
+                                        class="px-4 py-3 text-center font-semibold border-r border-slate-200"
+                                    >
+                                        25%
+                                    </th>
+                                </template>
+                                <th class="px-4 py-3 text-center font-semibold border-r border-slate-200"></th>
+                                <th colspan="2" class="px-4 py-3 text-center font-semibold border-r border-slate-200 bg-emerald-50">
+                                    {{ selectedQuarterLabel }}
                                 </th>
                                 <th colspan="2" class="px-4 py-3 text-center font-semibold border-r border-slate-200 bg-emerald-50">
-                                    3rd Quarter
-                                </th>
-                                <th colspan="2" class="px-4 py-3 text-center font-semibold border-r border-slate-200 bg-emerald-50">
-                                    Second Quarter
+                                    Previous Quarter
                                 </th>
                                 <th colspan="2" class="px-4 py-3 text-center font-semibold border-r border-slate-200 bg-emerald-50">
                                     Final Grade
                                 </th>
-                                <th rowspan="3" class="px-6 py-3 text-center font-semibold border-l border-slate-200 bg-amber-50 w-40">
+                                <th rowspan="2" class="px-6 py-3 text-center font-semibold border-l border-slate-200 bg-amber-50 w-40">
                                     Adjectival Equivalent
                                 </th>
                             </tr>
                             <tr class="text-[10px] border-b border-slate-100 bg-white text-slate-500">
-                                <th class="px-2 py-2 border-r border-slate-100">LT1</th>
-                                <th class="px-2 py-2 border-r border-slate-100">T</th>
-                                <th class="px-2 py-2 border-r border-slate-100">%</th>
-                                <th class="px-2 py-2 border-r border-slate-100 font-medium text-emerald-500">W%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">LT2</th>
-                                <th class="px-2 py-2 border-r border-slate-100">T</th>
-                                <th class="px-2 py-2 border-r border-slate-100">%</th>
-                                <th class="px-2 py-2 border-r border-slate-100 font-medium text-emerald-500">W%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">AA1</th>
-                                <th class="px-2 py-2 border-r border-slate-100">AA2</th>
-                                <th class="px-2 py-2 border-r border-slate-100">T</th>
-                                <th class="px-2 py-2 border-r border-slate-100">%</th>
-                                <th class="px-2 py-2 border-r border-slate-100 font-medium text-emerald-500">W%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">FA1</th>
-                                <th class="px-2 py-2 border-r border-slate-100">FA2</th>
-                                <th class="px-2 py-2 border-r border-slate-100">FA3</th>
-                                <th class="px-2 py-2 border-r border-slate-100">T</th>
-                                <th class="px-2 py-2 border-r border-slate-100">%</th>
-                                <th class="px-2 py-2 border-slate-100 font-medium text-emerald-500">W%</th>
-                                <th class="px-2 py-2 border-r border-slate-100 font-bold text-gray-800">TW%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">GE</th>
-                                <th class="px-2 py-2 border-r border-slate-100">2/3</th>
-                                <th class="px-2 py-2 border-r border-slate-100">G</th>
-                                <th class="px-2 py-2 border-r border-slate-100">1/3</th>
-                                <th class="px-2 py-2 border-r border-slate-100">Trunc</th>
-                                <th class="px-2 py-2 border-r border-slate-100">GE</th>
-                            </tr>
-                            <tr class="text-[10px] border-b border-slate-100 bg-gray-200 text-slate-500">
-                                <th class="px-2 py-2 border-r border-slate-100 w-150" style="width:300px">Family Name</th>
-                                <th class="px-2 py-2 border-r border-slate-100">Given Name</th>
-                                <th class="px-2 py-2 border-r border-slate-100">M.I.</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ tableRows.longTests?.[0].perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ tableRows.longTests?.[0].perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">100</th>
-                                <th class="px-2 py-2 border-r border-slate-100">25%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ tableRows.longTests?.[1].perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ tableRows.longTests?.[1].perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">100</th>
-                                <th class="px-2 py-2 border-r border-slate-100">25%</th>
-                                <th v-for="aa in tableRows.alternativeAssessments" :key="aa.id" class="px-2 py-2 border-r border-slate-100">{{ aa.perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ totalPerfectScore.aaPerfect }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">100</th>
-                                <th class="px-2 py-2 border-r border-slate-100">25%</th>
-                                <th v-for="fa in tableRows.formativeAssessments" :key="fa.id" class="px-2 py-2 border-r border-slate-100">{{ fa.perfect_score }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">{{ totalPerfectScore.faPerfect }}</th>
-                                <th class="px-2 py-2 border-r border-slate-100">100%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">25%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">100%</th>
-                                <th class="px-2 py-2 border-r border-slate-100">STA-9</th>
-                                <th class="px-2 py-2 border-r border-slate-100">0.67</th>
-                                <th class="px-2 py-2 border-r border-slate-100">1.00</th>
-                                <th class="px-2 py-2 border-r border-slate-100">0.33</th>
-                                <th class="px-2 py-2 border-r border-slate-100">1.00</th>
-                                <th class="px-2 py-2 border-r border-slate-100">STA-9</th>
+                                <template v-for="column in segmentColumns" :key="column.key">
+                                    <th class="px-2 py-2 border-r border-slate-100" :class="{ 'font-medium text-emerald-500': column.weighted }">
+                                        <span class="block">{{ column.label }}</span>
+                                        <span v-if="column.type === 'score' && column.perfectScore !== null" class="block text-[9px] text-slate-400">
+                                            {{ column.perfectScore }}
+                                        </span>
+                                    </th>
+                                </template>
+                                <th
+                                    v-for="column in SUMMARY_COLUMNS"
+                                    :key="column.key"
+                                    class="px-2 py-2 border-r border-slate-100"
+                                    :class="{ 'font-bold text-gray-800': column.type === 'tw' }"
+                                >
+                                    {{ column.label }}
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-[11px] bg-white">
                             <tr
-                                v-for="row in tableRows.rows"
-                                :key="row.id"
+                                v-for="row in tableData.rows"
+                                :key="row.learnerId"
                                 class="hover:bg-slate-50"
                             >
-                                <td class="px-4 py-3 border-r border-slate-100 font-medium sticky left-0 bg-white z-10">{{ row.familyName }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.givenName }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.middleInitial }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.lt1.score }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.lt1.score }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ ((row.lt1.score / totalPerfectScore.lt1Perfect)*100 || 0).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100 text-emerald-500 font-medium">{{ (((row.lt1.score / totalPerfectScore.lt1Perfect)*100 || 0)*0.25 ).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.lt2.score }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.lt2.score }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ ((row.lt2.score / totalPerfectScore.lt2Perfect)*100 || 0).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100 text-emerald-500 font-medium">{{ (((row.lt2.score / totalPerfectScore.lt2Perfect)*100 || 0)*0.25 ).toFixed(2) }}%</td>
-                                <td v-for="aa in row.alternativeAssessments" :key="aa.id" class="px-3 py-3 text-center border-r border-slate-100">{{ aa }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ totalScore(row.alternativeAssessments).toFixed(2) }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ ((totalScore(row.alternativeAssessments) / totalPerfectScore.aaPerfect)*100 || 0).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100 text-emerald-500 font-medium">{{ (((totalScore(row.alternativeAssessments) / totalPerfectScore.aaPerfect)*100 || 0)*0.25 ).toFixed(2) }}%</td>
-                                <td v-for="fa in row.formativeAssessments" :key="fa.id" class="px-3 py-3 text-center border-r border-slate-100">{{ fa }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ totalScore(row.formativeAssessments).toFixed(2) }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ ((totalScore(row.formativeAssessments) / totalPerfectScore.faPerfect)*100 || 0).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100 text-emerald-500 font-medium">{{ (((totalScore(row.formativeAssessments) / totalPerfectScore.faPerfect)*100 || 0)*0.25 ).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100 text-orange-500 font-medium">{{ ((((row.lt1.score / totalPerfectScore.lt1Perfect)*100 || 0)*0.25 ) + (((row.lt2.score / totalPerfectScore.lt2Perfect)*100 || 0)*0.25 ) + (((totalScore(row.alternativeAssessments) / totalPerfectScore.aaPerfect)*100 || 0)*0.25 ) + (((totalScore(row.formativeAssessments) / totalPerfectScore.faPerfect)*100 || 0)*0.25 )).toFixed(2) }}%</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.ge }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.twoThirds }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.gScore }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.oneThird }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.trunc }}</td>
-                                <td class="px-3 py-3 text-center border-r border-slate-100">{{ row.finalGe }}</td>
-                                <td class="px-4 py-3 text-center border-r border-slate-100 font-medium text-emerald-500">{{ row.adjectival }}</td>
+                                <td class="px-4 py-3 border-r border-slate-100 font-medium sticky left-0 bg-white z-10">
+                                    {{ learnerName(row.learner).familyName }}
+                                </td>
+                                <td class="px-3 py-3 text-center border-r border-slate-100">
+                                    {{ learnerName(row.learner).givenName }}
+                                </td>
+                                <td class="px-3 py-3 text-center border-r border-slate-100">
+                                    {{ learnerName(row.learner).middleInitial }}
+                                </td>
+                                <td
+                                    v-for="column in bodyColumns"
+                                    :key="column.key"
+                                    class="px-3 py-3 text-center border-r border-slate-100"
+                                    :class="[
+                                        { 'text-emerald-500 font-medium': column.weighted },
+                                        isTentative(row, column) ? 'bg-amber-50 text-amber-700 font-semibold' : '',
+                                    ]"
+                                >
+                                    {{ cellValue(row, column) }}
+                                    <span
+                                        v-if="isTentative(row, column)"
+                                        class="ml-1 text-[9px] font-bold uppercase text-amber-600"
+                                    >
+                                        T
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center border-r border-slate-100 font-medium text-emerald-500">
+                                    {{ row.summary?.adjectival ?? '—' }}
+                                </td>
                             </tr>
-                            <tr v-if="!tableRows.rows.length" class="bg-white">
-                                <td colspan="30" class="px-4 py-6 text-center text-sm text-slate-400">
-                                    No quarterly breakdown available yet.
+                            <tr v-if="!tableData.rows.length" class="bg-white">
+                                <td :colspan="bodyColumns.length + 4" class="px-4 py-6 text-center text-sm text-slate-400">
+                                    No learners are enrolled in this section for the active school year.
+                                </td>
+                            </tr>
+                            <tr v-else-if="!quarterAssessments.length" class="bg-white">
+                                <td :colspan="bodyColumns.length + 4" class="px-4 py-6 text-center text-sm text-slate-400">
+                                    No assessments recorded for {{ selectedQuarterLabel }} yet.
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+            <p v-if="hasAnyTentative" class="mt-2 text-[10px] font-semibold uppercase tracking-widest text-amber-600">
+                T = tentative score
+            </p>
         </div>
     </div>
 </template>
 
 <style>
-    .w-150 {
-        width: 150px!important;
-    }
     .table-fixed {
         table-layout: fixed;
     }

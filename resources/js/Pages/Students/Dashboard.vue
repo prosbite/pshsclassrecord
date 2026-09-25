@@ -3,22 +3,22 @@ import { computed, reactive, ref, watch } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
 import {
-    calculatePercentage,
-    calculateWeightedPercentage,
-    formatGradeEquivalent,
-    getAdjectivalEquivalent,
-    getGradeEquivalentFromPercent,
-    getGradeEquivalentFromValue,
-} from '@/Composables/utilities.js';
+    buildQuarterResult,
+    buildQuarterResultFromEntries,
+    buildSegmentEntries,
+    detailEntriesForSegment as filterDetailEntries,
+    groupAssessmentsBySegment,
+    hasSegmentAssessments,
+} from '@/Composables/assessmentGrading.js';
+import { getAdjectivalEquivalent } from '@/Composables/utilities.js';
 
 const props = defineProps({
     student: { type: Object, default: null },
     section: { type: Object, default: null },
     schoolYear: { type: Object, default: null },
-    quarterlyAssessments: { type: Array, default: () => [] },
+    assessments: { type: Array, default: () => [] },
 });
 
-// ... (All your existing computed properties, methods, and logic remain unchanged)
 const studentName = computed(() => {
     if (!props.student) return 'Scholar';
 
@@ -42,7 +42,7 @@ const currentYearLabel = computed(() => {
     return `${props.schoolYear.year_start}-${props.schoolYear.year_end}`;
 });
 
-const hasAssessments = computed(() => props.quarterlyAssessments.length > 0);
+const hasAssessments = computed(() => props.assessments.length > 0);
 
 const quarterOrder = [1, 2, 3, 4];
 const quarterLabels = {
@@ -52,50 +52,112 @@ const quarterLabels = {
     4: '4th Quarter',
 };
 
+const learnerId = computed(() => props.student?.id ?? null);
+
+const scoresByLearner = computed(() => {
+    const map = {};
+    const id = learnerId.value;
+
+    if (id === null || id === undefined) {
+        return map;
+    }
+
+    map[id] = {};
+    props.assessments.forEach((assessment) => {
+        map[id][assessment.id] = assessment.score ?? null;
+    });
+
+    return map;
+});
+
+const tentativesByLearner = computed(() => {
+    const map = {};
+    const id = learnerId.value;
+
+    if (id === null || id === undefined) {
+        return map;
+    }
+
+    map[id] = {};
+    props.assessments.forEach((assessment) => {
+        map[id][assessment.id] = Boolean(assessment.tentative);
+    });
+
+    return map;
+});
+
 const quarterAssessmentsByIndex = computed(() => {
     const mapping = quarterOrder.reduce((acc, quarter) => { acc[quarter] = []; return acc; }, {});
 
-    props.quarterlyAssessments.forEach((assessment) => {
-        const quarterIndex = Number(assessment.quarter?.index ?? assessment.quarter?.quarter ?? null);
+    props.assessments.forEach((assessment) => {
+        const quarterIndex = Number(assessment.quarter?.quarter ?? null);
         if (!quarterOrder.includes(quarterIndex)) return;
 
         mapping[quarterIndex].push(assessment);
     });
 
-    return Object.fromEntries(
-        Object.entries(mapping).map(([quarter, assessments]) => [
-            quarter,
-            assessments.slice().sort((a, b) => new Date(b.uploadedAt ?? b.created_at) - new Date(a.uploadedAt ?? a.created_at))
-        ])
-    );
+    return mapping;
 });
+
+const groupedByQuarter = computed(() => Object.fromEntries(
+    Object.entries(quarterAssessmentsByIndex.value).map(([quarter, assessments]) => [
+        quarter,
+        groupAssessmentsBySegment(assessments),
+    ]),
+));
+
+const availableQuarters = computed(() =>
+    quarterOrder.filter((quarter) => quarterAssessmentsByIndex.value[quarter]?.length));
 
 const selectedQuarter = ref(4);
-const selectedQuarterAssessment = computed(() => {
-    if (!selectedQuarter.value) return null;
-    return (quarterAssessmentsByIndex.value[selectedQuarter.value] ?? [])[0] ?? null;
+watch(
+    availableQuarters,
+    (available) => {
+        if (!available.includes(selectedQuarter.value)) {
+            selectedQuarter.value = available.length ? available[available.length - 1] : 4;
+        }
+    },
+    { immediate: true },
+);
+
+const selectedGrouped = computed(() => groupedByQuarter.value[selectedQuarter.value] ?? null);
+const hasSelectedQuarter = computed(() => hasSegmentAssessments(selectedGrouped.value));
+
+const segmentEntries = computed(() =>
+    buildSegmentEntries(selectedGrouped.value, scoresByLearner.value, learnerId.value, tentativesByLearner.value));
+
+const hasSegmentEntries = computed(() =>
+    Object.values(segmentEntries.value).some((entries) => entries.length));
+
+const previousQuarterGe = computed(() => {
+    const previousGrouped = groupedByQuarter.value[selectedQuarter.value - 1];
+
+    if (!hasSegmentAssessments(previousGrouped)) {
+        return null;
+    }
+
+    return buildQuarterResult(
+        previousGrouped,
+        scoresByLearner.value,
+        learnerId.value,
+        null,
+        tentativesByLearner.value,
+    ).currentGe;
 });
 
-// ... (Keep all your other methods unchanged: quarterTitle, getColumns, formatUploadedAt, etc.)
-const quarterTitle = (assessment) => assessment.quarter?.name || (assessment.quarter?.index ? `Quarter ${assessment.quarter.index}` : 'Quarter');
+const selectedQuarterResult = computed(() => {
+    if (!hasSelectedQuarter.value) {
+        return null;
+    }
 
-const yearLabelForAssessment = (assessment) =>
-    assessment.schoolYear?.year_start
-        ? `${assessment.schoolYear.year_start}-${assessment.schoolYear.year_end}`
-        : 'School year not set';
-
-const sectionLabelForAssessment = (assessment) => {
-    const section = assessment.section;
-    if (!section?.section_name) return 'Section not assigned';
-    return section.grade_level
-        ? `${section.grade_level} · ${section.section_name}`
-        : section.section_name;
-};
-
-const formatUploadedAt = (value) =>
-    value
-        ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : 'Date unavailable';
+    return buildQuarterResult(
+        selectedGrouped.value,
+        scoresByLearner.value,
+        learnerId.value,
+        previousQuarterGe.value,
+        tentativesByLearner.value,
+    );
+});
 
 const formatTwoDecimals = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -163,231 +225,6 @@ const formatPreciseDecimal = (value, digits = 2) => {
     return numericValue.toFixed(digits);
 };
 
-const truncateDecimal = (value, digits = 3) => {
-    if (value === null || value === undefined || value === '') {
-        return null;
-    }
-
-    const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) {
-        return null;
-    }
-
-    const factor = 10 ** digits;
-    return Math.trunc(numericValue * factor) / factor;
-};
-
-const parseHeaderMeta = (header) => {
-    const rawLabel = (header ?? '').toString().trim();
-    const tentative = /\(\s*t\s*\)/i.test(rawLabel);
-    const labelWithoutTentative = rawLabel.replace(/\s*\(\s*t\s*\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
-    const normalizedLabel = normalizeHeaderLabel(labelWithoutTentative || rawLabel);
-    const normalizedType = normalizedLabel.toLowerCase();
-
-    return {
-        rawLabel,
-        label: normalizedLabel,
-        fieldType: /^t$|^total$/i.test(normalizedType)
-            ? 'total'
-            : /^%$|^percentage$/i.test(normalizedType)
-                ? 'percentage'
-                : (
-                    /^w%$|^tw%$|^total\s*weighted\s*%$/i.test(normalizedType)
-                    || /^weighted\s?%$/i.test(normalizedType)
-                )
-                    ? 'weighted'
-                    : 'score',
-        tentative,
-    };
-};
-
-const isTentativeScore = (item) => {
-    const rawLabel = (item?.rawLabel ?? '').toString();
-    if (item?.tentative) {
-        return true;
-    }
-
-    return /\(\s*t\s*\)/i.test(rawLabel);
-};
-
-const normalizeHeaderLabel = (header) => {
-    const trimmed = (header ?? '').trim();
-    if (!trimmed) return '';
-    if (/^t$/i.test(trimmed)) return 'Total';
-    if (/^%$/i.test(trimmed)) return 'Percentage';
-    if (/^w%$/i.test(trimmed) || /^w\s?%$/i.test(trimmed) || /^tw%$/i.test(trimmed) || /^total\s*weighted\s*%$/i.test(trimmed) || /^weighted\s?%$/i.test(trimmed)) {
-        return 'Weighted %';
-    }
-    return trimmed.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-};
-
-const sanitizePerfectScore = (value) => {
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    const candidate = String(value).trim();
-    if (!candidate || candidate === '—' || candidate.toUpperCase() === '#REF!') {
-        return null;
-    }
-
-    return candidate;
-};
-
-const detectSegment = (normalized) => {
-    if (!normalized) return null;
-    if (/(lt1|long\s?test\s?1|longtest1)/i.test(normalized)) return 'lt1';
-    if (/(lt2|long\s?test\s?2|longtest2)/i.test(normalized)) return 'lt2';
-    if (/(aa|alternative)/i.test(normalized)) return 'aa';
-    if (/(fa|formative)/i.test(normalized)) return 'fa';
-    if (/(final|trunc|ge|adjectival|two.*third|one.*third)/i.test(normalized)) return 'final';
-    return null;
-};
-
-const extractSegments = (assessment) => {
-    const headers = assessment?.studentRow?.headers ?? [];
-    const values = assessment?.studentRow?.values ?? [];
-    const subheaders = assessment?.studentRow?.subheader_values ?? [];
-
-    const buckets = {
-        lt1: [],
-        lt2: [],
-        aa: [],
-        fa: [],
-        final: [],
-        other: [],
-    };
-
-    let currentSegment = null;
-
-    headers.forEach((header, index) => {
-        const normalized = (header ?? '').toLowerCase();
-        const detected = detectSegment(normalized);
-
-        if (detected) {
-            currentSegment = detected;
-        }
-
-        if (/(family|given|middle|gender)/i.test(normalized)) {
-            return;
-        }
-
-        const entry = {
-            key: `${currentSegment ?? 'other'}-${index}-${header ?? `Column ${index + 1}`}`,
-            ...parseHeaderMeta(header || `Column ${index + 1}`),
-            value: values[index] ?? '—',
-            perfectScore: sanitizePerfectScore(subheaders[index]),
-        };
-
-        const bucket = currentSegment ?? 'other';
-        buckets[bucket] = buckets[bucket] ?? [];
-        buckets[bucket].push(entry);
-    });
-
-    return buckets;
-};
-
-const entriesForSegment = (assessment, segment) => {
-    if (!assessment) return [];
-    return extractSegments(assessment)[segment] ?? [];
-};
-
-const isTwoThirdEntry = (label) => {
-    const normalized = (label ?? '').toLowerCase();
-    return /(tw%?|two.*third)/i.test(normalized);
-};
-
-const detailEntriesForSegment = (assessment, segment) => {
-    const entries = entriesForSegment(assessment, segment);
-    if (segment !== 'fa') {
-        return entries;
-    }
-
-    let weightedSeen = false;
-
-    return entries.filter((entry) => {
-        if (isTwoThirdEntry(entry.label)) {
-            return false;
-        }
-
-        if (entry.fieldType !== 'weighted') {
-            return true;
-        }
-
-        if (weightedSeen) {
-            return false;
-        }
-
-        weightedSeen = true;
-        return true;
-    });
-};
-
-const finalSegmentEntries = (assessment) => entriesForSegment(assessment, 'final');
-
-const finalGradeOverview = (assessment) => {
-    const entries = finalSegmentEntries(assessment);
-    const geEntries = entries.filter(
-        (entry) => /^ge$/i.test(entry.label) || /ge\s?[^a-z]*$/i.test(entry.label)
-    );
-    const adjectivalEntry = entries.find((entry) => /adjectival/i.test(entry.label));
-    const truncEntry = entries.find((entry) => /trunc/i.test(entry.label));
-    const geEntry = geEntries.length ? geEntries[geEntries.length - 1] : null;
-
-    return {
-        ge: geEntry,
-        adjectival: adjectivalEntry,
-        trunc: truncEntry,
-    };
-};
-
-const hasFinalOverview = (assessment) => {
-    if (!assessment) return false;
-    const overview = finalGradeOverview(assessment);
-    return Boolean(overview.ge || overview.adjectival || overview.trunc);
-};
-
-const formatLabel = (label) => {
-    const normalized = (label ?? '').replace(/_/g, ' ').trim();
-    if (!normalized) return label;
-    return normalized
-        .split(' ')
-        .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-        .join(' ');
-};
-
-const entryLabel = (segment, label, index) => {
-    if ((segment === 'lt1' || segment === 'lt2') && index === 0) {
-        return 'Score';
-    }
-
-    return formatLabel(label);
-};
-
-const segmentConfig = {
-    lt1: { title: 'Long Test 1', accent: 'from-emerald-50 to-white' },
-    lt2: { title: 'Long Test 2', accent: 'from-sky-50 to-white' },
-    aa: { title: 'Alternative Assessments', accent: 'from-amber-50 to-white' },
-    fa: { title: 'Formative Assessments', accent: 'from-slate-50 to-white' },
-    final: { title: 'Quarterly Summary', accent: 'from-indigo-50 to-white' },
-};
-
-const detailSegments = ['lt1', 'lt2', 'aa', 'fa'];
-
-const twoThirdEntry = (assessment) => {
-    if (!assessment) return null;
-    return entriesForSegment(assessment, 'fa').find((entry) => isTwoThirdEntry(entry.label)) ?? null;
-};
-
-const simulationMode = ref(false);
-const simulationDraft = reactive({});
-
-const clearSimulationDraft = () => {
-    Object.keys(simulationDraft).forEach((key) => {
-        delete simulationDraft[key];
-    });
-};
-
 const isScoreEntry = (entry) => entry?.fieldType === 'score';
 
 const toNumericValue = (value) => {
@@ -419,134 +256,75 @@ const getSimulationValue = (entry) => {
         : draftValue;
 };
 
-const segmentScoreEntries = (assessment, segment) =>
-    entriesForSegment(assessment, segment).filter((entry) => isScoreEntry(entry));
-
-const buildSegmentMetrics = (assessment, segment) => {
-    const scoreEntries = segmentScoreEntries(assessment, segment);
-
-    const score = scoreEntries.reduce((sum, entry) => {
-        const numericValue = toNumericValue(getSimulationValue(entry)) ?? 0;
-        return sum + numericValue;
-    }, 0);
-
-    const perfectScore = scoreEntries.reduce((sum, entry) => {
-        const numericValue = toNumericValue(entry.perfectScore) ?? 0;
-        return sum + numericValue;
-    }, 0);
-
-    const percentage = calculatePercentage(score, perfectScore);
-    const weighted = calculateWeightedPercentage(score, perfectScore);
-
-    return {
-        score,
-        perfectScore,
-        percentage,
-        weighted,
-    };
-};
-
-const displayEntryValue = (assessment, segment, entry) => {
+const displayEntryValue = (segment, entry) => {
     if (!simulationMode.value) {
         return entry.value;
     }
 
-    const metrics = buildSegmentMetrics(assessment, segment);
+    const metrics = simulatedQuarterResult.value?.segments?.[segment];
 
     if (entry.fieldType === 'score') {
         return getSimulationValue(entry);
     }
 
     if (entry.fieldType === 'total') {
-        return metrics.score;
+        return metrics?.score;
     }
 
     if (entry.fieldType === 'percentage') {
-        return metrics.percentage;
+        return metrics?.percentage;
     }
 
     if (entry.fieldType === 'weighted') {
-        return metrics.weighted;
+        return metrics?.weighted;
     }
 
     return entry.value;
 };
 
-const selectedQuarterResult = computed(() => {
-    const assessment = selectedQuarterAssessment.value;
+const detailEntriesForSegment = (segment) =>
+    filterDetailEntries(segmentEntries.value[segment] ?? [], segment);
 
-    if (!assessment) {
-        return null;
+const formatLabel = (label) => {
+    const normalized = (label ?? '').replace(/_/g, ' ').trim();
+    if (!normalized) return label;
+    return normalized
+        .split(' ')
+        .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+        .join(' ');
+};
+
+const entryLabel = (segment, label, index) => {
+    if ((segment === 'lt1' || segment === 'lt2') && index === 0) {
+        return 'Score';
     }
 
-    const rawFinalOverview = finalGradeOverview(assessment);
+    return formatLabel(label);
+};
 
-    const currentSegmentMetrics = {
-        lt1: buildSegmentMetrics(assessment, 'lt1'),
-        lt2: buildSegmentMetrics(assessment, 'lt2'),
-        aa: buildSegmentMetrics(assessment, 'aa'),
-        fa: buildSegmentMetrics(assessment, 'fa'),
-    };
+const segmentConfig = {
+    lt1: { title: 'Long Test 1', accent: 'from-emerald-50 to-white' },
+    lt2: { title: 'Long Test 2', accent: 'from-sky-50 to-white' },
+    aa: { title: 'Alternative Assessments', accent: 'from-amber-50 to-white' },
+    fa: { title: 'Formative Assessments', accent: 'from-slate-50 to-white' },
+    final: { title: 'Quarterly Summary', accent: 'from-indigo-50 to-white' },
+};
 
-    const twPercent = ['lt1', 'lt2', 'aa', 'fa']
-        .reduce((sum, segment) => sum + (currentSegmentMetrics[segment].weighted ?? 0), 0);
+const detailSegments = ['lt1', 'lt2', 'aa', 'fa'];
 
-    const currentGe = getGradeEquivalentFromPercent(twPercent);
-    const currentThird = currentGe === null ? null : currentGe * (2 / 3);
+const simulationMode = ref(false);
+const simulationDraft = reactive({});
 
-    const previousQuarterAssessment = quarterAssessmentsByIndex.value[selectedQuarter.value - 1]?.[0] ?? null;
-    const previousGe = previousQuarterAssessment
-        ? finalGradeOverview(previousQuarterAssessment).ge?.value ?? null
-        : null;
-    const previousThird = previousGe === null ? null : previousGe * (1 / 3);
+const clearSimulationDraft = () => {
+    Object.keys(simulationDraft).forEach((key) => {
+        delete simulationDraft[key];
+    });
+};
 
-    const truncSource = currentThird !== null && previousThird !== null
-        ? currentThird + previousThird
-        : currentGe;
-    const trunc = truncateDecimal(truncSource, 3);
-    const simulatedFinalGe = previousThird !== null
-        ? getGradeEquivalentFromValue(trunc)
-        : currentGe;
-    const finalGe = simulationMode.value
-        ? simulatedFinalGe
-        : rawFinalOverview.ge?.value ?? simulatedFinalGe;
-    const adjectival = simulationMode.value
-        ? getAdjectivalEquivalent(finalGe)
-        : rawFinalOverview.adjectival?.value ?? getAdjectivalEquivalent(finalGe);
-
-    return {
-        assessment,
-        segments: currentSegmentMetrics,
-        twPercent,
-        currentGe,
-        currentThird,
-        previousGe,
-        previousThird,
-        trunc,
-        finalGe,
-        adjectival,
-    };
-});
-
-const activeQuarterResult = computed(() => selectedQuarterResult.value);
-const displayedQuarterSummary = computed(() => {
-    if (!simulationMode.value) {
-        return null;
-    }
-
-    return activeQuarterResult.value;
-});
-
-const initializeSimulationDraft = (assessment) => {
+const initializeSimulationDraft = () => {
     clearSimulationDraft();
 
-    if (!assessment) {
-        return;
-    }
-
-    const segments = extractSegments(assessment);
-
-    Object.values(segments).flat().forEach((entry) => {
+    Object.values(segmentEntries.value).flat().forEach((entry) => {
         if (entry.fieldType === 'score') {
             simulationDraft[entry.key] = formatEditableValue(entry.value);
         }
@@ -554,18 +332,39 @@ const initializeSimulationDraft = (assessment) => {
 };
 
 watch(
-    [selectedQuarterAssessment, simulationMode],
-    ([assessment, enabled]) => {
+    [segmentEntries, simulationMode],
+    ([, enabled]) => {
         if (enabled) {
-            initializeSimulationDraft(assessment);
+            initializeSimulationDraft();
             return;
         }
 
         clearSimulationDraft();
     },
-    { immediate: true }
+    { immediate: true },
 );
 
+const simulationEntries = computed(() =>
+    Object.fromEntries(
+        Object.entries(segmentEntries.value).map(([segment, entries]) => [
+            segment,
+            entries.map((entry) => ({ ...entry, value: getSimulationValue(entry) })),
+        ]),
+    ));
+
+const simulatedQuarterResult = computed(() => {
+    if (!hasSelectedQuarter.value) {
+        return null;
+    }
+
+    return buildQuarterResultFromEntries(simulationEntries.value, previousQuarterGe.value);
+});
+
+const displayedQuarterSummary = computed(() =>
+    (simulationMode.value ? simulatedQuarterResult.value : null));
+
+const finalAdjectival = computed(() =>
+    selectedQuarterResult.value?.adjectival ?? getAdjectivalEquivalent(selectedQuarterResult.value?.finalGe));
 </script>
 
 <template>
@@ -600,14 +399,6 @@ watch(
                             We could not locate a section assignment for you. Please contact your adviser.
                         </p>
                     </div>
-
-                    <!-- <div class="flex-shrink-0 text-right">
-                        <p class="text-xs uppercase tracking-[0.125em] text-slate-400">Quarterly Uploads</p>
-                        <p class="mt-1 text-5xl font-semibold tracking-tighter text-slate-900">
-                            {{ hasAssessments ? props.quarterlyAssessments.length : 0 }}
-                        </p>
-                        <p class="text-sm text-slate-500">assessments</p>
-                    </div> -->
                 </div>
             </div>
 
@@ -653,22 +444,19 @@ watch(
                 </div>
 
                 <div v-if="!hasAssessments" class="mt-12 rounded-2xl bg-slate-50 py-16 text-center">
-                    <p class="text-slate-400">No quarterly breakdowns uploaded yet.</p>
-                    <p class="mt-2 text-sm text-slate-500">Check back after your adviser uploads the assessment data.</p>
+                    <p class="text-slate-400">No assessments have been recorded yet.</p>
+                    <p class="mt-2 text-sm text-slate-500">Check back after your adviser records the assessment data.</p>
                 </div>
 
                 <!-- Selected Quarter Content -->
                 <div v-else class="mt-10">
-                    <div v-if="!selectedQuarterAssessment" class="rounded-2xl bg-slate-50 py-12 text-center text-slate-500">
+                    <div v-if="!hasSelectedQuarter" class="rounded-2xl bg-slate-50 py-12 text-center text-slate-500">
                         No data available for {{ quarterLabels[selectedQuarter] ?? 'this quarter' }} yet.
                     </div>
 
                     <div v-else class="space-y-8">
-                        <!-- Upload Info -->
-
                         <!-- Detail Segments -->
-                        <div v-if="selectedQuarterAssessment.studentRow?.values?.length"
-                             class="grid gap-6 md:grid-cols-2">
+                        <div v-if="hasSegmentEntries" class="grid gap-6 md:grid-cols-2">
                             <div
                                 v-for="segment in detailSegments"
                                 :key="segment"
@@ -681,26 +469,25 @@ watch(
                                     </p>
                                 </div>
 
-                                <div v-if="detailEntriesForSegment(selectedQuarterAssessment, segment).length"
-                                     class="mt-5 space-y-3">
+                                <div v-if="detailEntriesForSegment(segment).length" class="mt-5 space-y-3">
                                     <div
-                                        v-for="(item, entryIndex) in detailEntriesForSegment(selectedQuarterAssessment, segment)"
-                                        :key="`${selectedQuarterAssessment.id}-${segment}-${item.label}`"
-                                        :class="[
-                                            'flex justify-between items-center rounded-2xl px-5 py-4 text-sm transition-colors',
-                                            isTentativeScore(item)
-                                                ? 'border border-amber-300 bg-amber-50/80'
-                                                : 'bg-slate-50',
-                                        ]"
+                                        v-for="(item, entryIndex) in detailEntriesForSegment(segment)"
+                                        :key="item.key"
+                                        class="flex justify-between items-center rounded-2xl px-5 py-4 text-sm transition-colors"
+                                        :class="item.tentative
+                                            ? 'bg-amber-50 ring-1 ring-amber-200'
+                                            : 'bg-slate-50'"
                                     >
-                                        <span class="font-medium text-slate-700">{{ entryLabel(segment, item.label, entryIndex) }}</span>
-                                        <div class="text-right">
+                                        <span class="font-medium text-slate-700">
+                                            {{ entryLabel(segment, item.label, entryIndex) }}
                                             <span
-                                                v-if="isTentativeScore(item)"
-                                                class="mb-1 inline-flex -translate-x-1 rounded-full bg-amber-200 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-800"
+                                                v-if="item.tentative"
+                                                class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
                                             >
                                                 Tentative Score
                                             </span>
+                                        </span>
+                                        <div class="text-right">
                                             <input
                                                 v-if="simulationMode && item.fieldType === 'score'"
                                                 v-model="simulationDraft[item.key]"
@@ -710,10 +497,9 @@ watch(
                                                 class="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-right text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                             />
                                             <span v-else class="font-semibold text-slate-900">
-                                                {{ formatAssessmentValue(item.label, displayEntryValue(selectedQuarterAssessment, segment, item)) }}
+                                                {{ formatAssessmentValue(item.label, displayEntryValue(segment, item)) }}
                                             </span>
-                                            <span v-if="item.perfectScore"
-                                                  class="block text-xs text-slate-400 tracking-wider">
+                                            <span v-if="item.perfectScore" class="block text-xs text-slate-400 tracking-wider">
                                                 / {{ formatAssessmentOverallValue(item.label, item.perfectScore) }}
                                             </span>
                                         </div>
@@ -725,7 +511,7 @@ watch(
                             </div>
                         </div>
 
-                        <!-- Final Grade Overview -->
+                        <!-- Live Simulation Breakdown -->
                         <div
                             v-if="simulationMode && displayedQuarterSummary"
                             class="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-8 shadow-sm"
@@ -794,13 +580,13 @@ watch(
                                         </p>
                                         <div class="mt-3 space-y-2">
                                             <div
-                                                v-for="item in detailEntriesForSegment(selectedQuarterAssessment, segment).filter((entry) => isScoreEntry(entry))"
-                                                :key="`${selectedQuarterAssessment.id}-breakdown-${segment}-${item.key}`"
+                                                v-for="item in detailEntriesForSegment(segment).filter((entry) => isScoreEntry(entry))"
+                                                :key="`breakdown-${segment}-${item.key}`"
                                                 class="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm shadow-sm"
                                             >
                                                 <span class="font-medium text-slate-700">{{ item.label }}</span>
                                                 <span class="font-semibold text-slate-900">
-                                                    {{ formatAssessmentValue(item.label, displayEntryValue(selectedQuarterAssessment, segment, item)) }}
+                                                    {{ formatAssessmentValue(item.label, displayEntryValue(segment, item)) }}
                                                     <span v-if="item.perfectScore" class="text-slate-400">
                                                         / {{ formatAssessmentOverallValue(item.label, item.perfectScore) }}
                                                     </span>
@@ -894,11 +680,13 @@ watch(
                                     </div>
                                 </div>
                             </div>
-
                         </div>
 
-                        <div v-else-if="hasFinalOverview(selectedQuarterAssessment)"
-                             class="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-8 shadow-sm">
+                        <!-- Final Grade Overview -->
+                        <div
+                            v-else-if="selectedQuarterResult"
+                            class="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-8 shadow-sm"
+                        >
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="uppercase tracking-[0.125em] text-xs text-indigo-600 font-medium">Summary</p>
@@ -910,30 +698,29 @@ watch(
                             </div>
 
                             <div class="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-2">
-                                <div v-if="finalGradeOverview(selectedQuarterAssessment).ge"
-                                     class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                     <p class="text-xs text-slate-500">Grade Equivalent</p>
                                     <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ formatTwoDecimals(finalGradeOverview(selectedQuarterAssessment).ge.value) }}
+                                        {{ formatTwoDecimals(selectedQuarterResult.finalGe) }}
                                     </p>
                                 </div>
-                                <div v-if="finalGradeOverview(selectedQuarterAssessment).adjectival"
-                                     class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                     <p class="text-xs text-slate-500">Adjectival Rating</p>
                                     <p class="text-3xl font-semibold text-slate-900 mt-2">
-                                        {{ formatTwoDecimals(finalGradeOverview(selectedQuarterAssessment).adjectival.value) }}
+                                        {{ finalAdjectival }}
                                     </p>
                                 </div>
                             </div>
+                            <p
+                                v-if="selectedQuarterResult.hasTentative"
+                                class="mt-4 text-xs font-semibold uppercase tracking-widest text-amber-600"
+                            >
+                                Includes tentative scores
+                            </p>
                         </div>
 
-                        <!-- Fallback Messages -->
-                        <p v-else-if="selectedQuarterAssessment.hasPayload"
-                           class="text-center text-slate-500 py-8">
-                            We couldn't find your record in this upload. Please ensure your name/email matches the CSV.
-                        </p>
                         <p v-else class="text-center text-slate-500 py-8">
-                            This assessment does not contain any student data rows yet.
+                            This quarter does not contain any assessment data yet.
                         </p>
                     </div>
                 </div>

@@ -16,15 +16,15 @@ class AssessmentTypeSeeder extends Seeder
     public function run(): void
     {
         $types = [
-            'Long Test' => 25,
-            'Alternative Assessment' => 25,
-            'Formative Assessment' => 25,
+            'Long Test' => ['percentage' => 25, 'code' => 'long_test'],
+            'Alternative Assessment' => ['percentage' => 25, 'code' => 'alternative'],
+            'Formative Assessment' => ['percentage' => 25, 'code' => 'formative'],
         ];
 
-        foreach ($types as $name => $percentage) {
+        foreach ($types as $name => $attributes) {
             AssessmentType::updateOrCreate(
                 ['name' => $name],
-                ['percentage' => $percentage]
+                $attributes
             );
         }
     }

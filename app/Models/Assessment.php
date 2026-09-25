@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use Database\Factories\AssessmentFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Assessment extends Model
 {
+    /** @use HasFactory<AssessmentFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'title',
         'assessment_type_id',
@@ -17,6 +22,11 @@ class Assessment extends Model
         'user_id',
         'assessment_date',
         'perfect_score',
+    ];
+
+    protected $casts = [
+        'assessment_date' => 'date',
+        'perfect_score' => 'integer',
     ];
 
     public function assessmentType(): BelongsTo
@@ -47,7 +57,7 @@ class Assessment extends Model
     public function learners(): BelongsToMany
     {
         return $this->belongsToMany(Learner::class, 'assessment_learners')
-            ->withPivot('score')
+            ->withPivot('score', 'tentative')
             ->withTimestamps();
     }
 }

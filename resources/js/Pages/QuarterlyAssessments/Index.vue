@@ -145,12 +145,13 @@ const confirmDelete = (assessment) => {
                             View every uploaded quarterly breakdown for {{ schoolYear ? `${schoolYear.year_start}-${schoolYear.year_end}` : 'the active school year' }}.
                         </p>
                     </div>
-                    <Link
+                    <!-- Upload hidden while structured assessments are the source of truth. -->
+                    <!-- <Link
                         :href="route('quarterly-assessments.upload')"
                         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.4em] text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                         Upload new CSV
-                    </Link>
+                    </Link> -->
                 </div>
             </div>
 

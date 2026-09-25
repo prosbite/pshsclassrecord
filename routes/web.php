@@ -8,11 +8,10 @@ use App\Http\Controllers\LoginTrackerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuarterlyAssessmentController;
 use App\Http\Controllers\QuarterlyAssessmentPageController;
-use App\Http\Controllers\StudentImpersonationController;
 use App\Http\Controllers\StudentDashboardController;
+use App\Http\Controllers\StudentImpersonationController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsStudent;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -52,6 +51,10 @@ Route::prefix('admin')
         Route::get('/assessments/section-learners', [AssessmentController::class, 'sectionLearners'])->name('assessments.section-learners');
         Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');
         Route::get('/assessments/summary', [AssessmentPageController::class, 'summary'])->name('assessments.summary');
+        Route::get('/assessments/{assessment}/edit', [AssessmentPageController::class, 'edit'])->name('assessments.edit');
+        Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
+        Route::patch('/assessments/{assessment}', [AssessmentController::class, 'update']);
+        Route::delete('/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('assessments.destroy');
         Route::get('/assessments/{assessment}', [AssessmentPageController::class, 'show'])->name('assessments.show');
         Route::get('/assessments', [AssessmentPageController::class, 'index'])->name('assessments.index');
         Route::get('/quarterly-assessments', [QuarterlyAssessmentPageController::class, 'index'])

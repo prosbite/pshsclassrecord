@@ -151,14 +151,15 @@ const toggleCollapse = () => {
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Assessments</span>
         </Link>
 
-        <Link
+        <!-- Quarterly CSV nav hidden while structured assessments are the source of truth. -->
+        <!-- <Link
           :href="route('quarterly-assessments.index')"
           class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
           :class="{ 'bg-slate-100 text-slate-900 shadow': isQuarterlyActive }"
         >
           <FolderIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Quarterly CSV</span>
-        </Link>
+        </Link> -->
 
         <Link
           :href="route('login-tracker.index')"

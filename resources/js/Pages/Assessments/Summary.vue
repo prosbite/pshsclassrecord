@@ -24,6 +24,14 @@ const props = defineProps({
         type: String,
         default: 'all',
     },
+    quarters: {
+        type: Array,
+        default: () => [],
+    },
+    selectedQuarterId: {
+        type: [String, Number],
+        default: null,
+    },
 });
 </script>
 
@@ -53,6 +61,8 @@ const props = defineProps({
                 :sections="props.sections"
                 :section="props.section"
                 :section-filter="props.sectionFilter"
+                :quarters="props.quarters"
+                :selected-quarter-id="props.selectedQuarterId"
             />
         </div>
     </MainAuthLayout>
