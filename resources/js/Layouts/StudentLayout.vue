@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -7,12 +7,80 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 const page = usePage();
 const user = computed(() => page.props.auth.user ?? {});
 const impersonation = computed(() => page.props.auth.impersonation ?? { active: false, admin_name: null });
+
+const flashSuccess = computed(() => page.props.flash?.success ?? null);
+const flashError = computed(() => page.props.flash?.error ?? null);
+
+const toast = ref(null);
+let toastTimer = null;
+
+const showToast = (message, type) => {
+    toast.value = { message, type };
+
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+
+    toastTimer = setTimeout(() => {
+        toast.value = null;
+    }, 4000);
+};
+
+watch(
+    [flashSuccess, flashError],
+    ([success, error]) => {
+        if (success) {
+            showToast(success, 'success');
+        } else if (error) {
+            showToast(error, 'error');
+        }
+    },
+    { immediate: true },
+);
+
+onBeforeUnmount(() => {
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+});
 </script>
 
 <template>
   <div class="min-h-screen bg-slate-50">
     <!-- Subtle top accent -->
     <div class="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500"></div>
+
+    <!-- Toast -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="toast"
+        class="fixed right-6 top-6 z-[60] flex max-w-sm items-start gap-3 rounded-2xl border bg-white px-5 py-4 shadow-lg"
+        :class="toast.type === 'success' ? 'border-emerald-200' : 'border-rose-200'"
+        role="status"
+      >
+        <span
+          class="mt-0.5 h-2.5 w-2.5 flex-none rounded-full"
+          :class="toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"
+        ></span>
+        <p class="text-sm font-medium" :class="toast.type === 'success' ? 'text-emerald-800' : 'text-rose-800'">
+          {{ toast.message }}
+        </p>
+        <button
+          type="button"
+          class="ml-auto text-slate-400 transition hover:text-slate-600"
+          @click="toast = null"
+        >
+          ×
+        </button>
+      </div>
+    </Transition>
 
     <!-- Header -->
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-sm">

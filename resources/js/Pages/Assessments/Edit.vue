@@ -19,6 +19,22 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    topics: {
+        type: Array,
+        default: () => [],
+    },
+    questionnaires: {
+        type: Array,
+        default: () => [],
+    },
+    selectedTopicIds: {
+        type: Array,
+        default: () => [],
+    },
+    selectedQuestionnaireIds: {
+        type: Array,
+        default: () => [],
+    },
     assessment: {
         type: Object,
         required: true,
@@ -45,6 +61,10 @@ const props = defineProps({
                 :assessment="props.assessment"
                 :initial-scores="props.learnerScores"
                 :initial-tentatives="props.learnerTentatives"
+                :topics="props.topics"
+                :questionnaires="props.questionnaires"
+                :selected-topic-ids="props.selectedTopicIds"
+                :selected-questionnaire-ids="props.selectedQuestionnaireIds"
             />
         </div>
     </MainAuthLayout>

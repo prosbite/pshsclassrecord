@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
 import {
     buildQuarterResult,
@@ -17,7 +17,29 @@ const props = defineProps({
     section: { type: Object, default: null },
     schoolYear: { type: Object, default: null },
     assessments: { type: Array, default: () => [] },
+    remediationByAssessment: { type: Object, default: () => ({}) },
+    remediationSummary: {
+        type: Object,
+        default: () => ({ ongoing: 0, completed: 0 }),
+    },
 });
+
+const remediationFor = (assessmentId) => props.remediationByAssessment?.[assessmentId] ?? null;
+
+const remediationTagLabel = (status) => ({
+    assigned: 'Preventive exercise available',
+    submitted: 'Preventive exercise submitted',
+    completed: 'Preventive exercise completed',
+}[status] ?? 'Preventive exercise');
+
+const remediationTagClasses = (status) => ({
+    assigned: 'bg-amber-100 text-amber-700',
+    submitted: 'bg-sky-100 text-sky-700',
+    completed: 'bg-emerald-100 text-emerald-700',
+}[status] ?? 'bg-slate-100 text-slate-600');
+
+const hasRemediation = computed(() => (props.remediationSummary?.ongoing ?? 0) > 0
+    || (props.remediationSummary?.completed ?? 0) > 0);
 
 const studentName = computed(() => {
     if (!props.student) return 'Scholar';
@@ -242,7 +264,7 @@ const formatEditableValue = (value) => {
 };
 
 const getSimulationValue = (entry) => {
-    if (!simulationMode.value || !isScoreEntry(entry)) {
+    if (!simulationMode.value || !isScoreEntry(entry) || !entry?.tentative) {
         return entry.value;
     }
 
@@ -302,6 +324,15 @@ const entryLabel = (segment, label, index) => {
     return formatLabel(label);
 };
 
+const assessmentShortLabel = (segment, index) => {
+    if (segment === 'lt1') return 'LT1';
+    if (segment === 'lt2') return 'LT2';
+    if (segment === 'aa') return `AA${(index ?? 0) + 1}`;
+    if (segment === 'fa') return `FA${(index ?? 0) + 1}`;
+
+    return null;
+};
+
 const segmentConfig = {
     lt1: { title: 'Long Test 1', accent: 'from-emerald-50 to-white' },
     lt2: { title: 'Long Test 2', accent: 'from-sky-50 to-white' },
@@ -325,7 +356,7 @@ const initializeSimulationDraft = () => {
     clearSimulationDraft();
 
     Object.values(segmentEntries.value).flat().forEach((entry) => {
-        if (entry.fieldType === 'score') {
+        if (entry.fieldType === 'score' && entry.tentative) {
             simulationDraft[entry.key] = formatEditableValue(entry.value);
         }
     });
@@ -399,6 +430,37 @@ const finalAdjectival = computed(() =>
                             We could not locate a section assignment for you. Please contact your adviser.
                         </p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Remediation Panel -->
+            <div
+                v-if="hasRemediation"
+                class="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm sm:p-8"
+            >
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1">
+                            <div class="h-2 w-2 rounded-full bg-indigo-500"></div>
+                            <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Preventive Exercises</p>
+                        </div>
+                        <div class="mt-4 flex flex-wrap gap-6">
+                            <p class="text-sm text-slate-600">
+                                <span class="text-2xl font-semibold text-slate-900">{{ remediationSummary.ongoing ?? 0 }}</span>
+                                ongoing
+                            </p>
+                            <p class="text-sm text-slate-600">
+                                <span class="text-2xl font-semibold text-slate-900">{{ remediationSummary.completed ?? 0 }}</span>
+                                completed
+                            </p>
+                        </div>
+                    </div>
+                    <Link
+                        :href="route('student.remediation.index')"
+                        class="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-slate-800"
+                    >
+                        View preventive exercises
+                    </Link>
                 </div>
             </div>
 
@@ -479,17 +541,25 @@ const finalAdjectival = computed(() =>
                                             : 'bg-slate-50'"
                                     >
                                         <span class="font-medium text-slate-700">
-                                            {{ entryLabel(segment, item.label, entryIndex) }}
+                                            {{ assessmentShortLabel(segment, item.index) ?? entryLabel(segment, item.label, entryIndex) }}
                                             <span
                                                 v-if="item.tentative"
                                                 class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
                                             >
                                                 Tentative Score
                                             </span>
+                                            <Link
+                                                v-if="remediationFor(item.assessmentId)"
+                                                :href="route('student.remediation.show', remediationFor(item.assessmentId).id)"
+                                                class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition hover:opacity-80"
+                                                :class="remediationTagClasses(remediationFor(item.assessmentId).status)"
+                                            >
+                                                {{ remediationTagLabel(remediationFor(item.assessmentId).status) }}
+                                            </Link>
                                         </span>
                                         <div class="text-right">
                                             <input
-                                                v-if="simulationMode && item.fieldType === 'score'"
+                                                v-if="simulationMode && item.fieldType === 'score' && item.tentative"
                                                 v-model="simulationDraft[item.key]"
                                                 type="number"
                                                 min="0"
