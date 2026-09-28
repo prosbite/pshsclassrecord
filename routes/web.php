@@ -3,6 +3,7 @@
 use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AssessmentPageController;
 use App\Http\Controllers\AssessmentRemediationController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ExerciseSessionController;
 use App\Http\Controllers\LearnerController;
@@ -20,7 +21,6 @@ use App\Http\Controllers\TopicController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsStudent;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
     if (! auth()->check()) {
@@ -45,9 +45,7 @@ Route::middleware(['auth', 'verified', EnsureUserIsStudent::class])
 Route::prefix('admin')
     ->middleware(['auth', 'verified', EnsureUserIsAdmin::class])
     ->group(function () {
-        Route::get('/dashboard', function () {
-            return Inertia::render('Dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
