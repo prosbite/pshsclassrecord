@@ -4,7 +4,6 @@ import { Link, usePage } from '@inertiajs/vue3'
 import {
   HomeIcon,
   UsersIcon,
-  FolderIcon,
   ChartBarIcon,
   ClockIcon,
   BookOpenIcon,
@@ -35,22 +34,15 @@ const currentPath = computed(() => {
   }
 })
 
-const quarterlyPaths = [
-  normalizePath(route('quarterly-assessments.index')),
-  normalizePath(route('quarterly-assessments.upload')),
-]
-
-const isQuarterlyActive = computed(() =>
-  quarterlyPaths.some((path) => currentPath.value.startsWith(path))
-)
-
 const studentsPath = normalizePath(route('students'))
+const dashboardPath = normalizePath(route('dashboard'))
 const assessmentsPath = normalizePath(route('assessments.index'))
 const loginTrackerPath = normalizePath(route('login-tracker.index'))
 const topicsPath = normalizePath(route('topics.index'))
 const questionnairesPath = normalizePath(route('questionnaires.index'))
 const questionsPath = normalizePath(route('questions.index'))
 const settingsPath = normalizePath(route('settings.edit'))
+const isDashboardActive = computed(() => currentPath.value === dashboardPath)
 const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
 const isLoginTrackerActive = computed(() => currentPath.value.startsWith(loginTrackerPath))
@@ -58,6 +50,17 @@ const isTopicsActive = computed(() => currentPath.value.startsWith(topicsPath))
 const isQuestionnairesActive = computed(() => currentPath.value.startsWith(questionnairesPath))
 const isQuestionsActive = computed(() => currentPath.value.startsWith(questionsPath))
 const isSettingsActive = computed(() => currentPath.value.startsWith(settingsPath))
+
+const navItems = computed(() => [
+  { label: 'Dashboard', href: dashboardPath, active: isDashboardActive.value, icon: HomeIcon },
+  { label: 'Students', href: studentsPath, active: isStudentsActive.value, icon: UsersIcon },
+  { label: 'Assessments', href: assessmentsPath, active: isAssessmentsActive.value, icon: ChartBarIcon },
+  { label: 'Topics', href: topicsPath, active: isTopicsActive.value, icon: BookOpenIcon },
+  { label: 'Questionnaires', href: questionnairesPath, active: isQuestionnairesActive.value, icon: ClipboardDocumentListIcon },
+  { label: 'Questions', href: questionsPath, active: isQuestionsActive.value, icon: DocumentTextIcon },
+  { label: 'Login Tracker', href: loginTrackerPath, active: isLoginTrackerActive.value, icon: ClockIcon },
+  { label: 'Settings', href: settingsPath, active: isSettingsActive.value, icon: Cog6ToothIcon },
+])
 
 const sidebarOpen = ref(false)
 const isCollapsed = ref(true)
@@ -143,79 +146,30 @@ const toggleCollapse = () => {
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-
+      <nav
+        class="flex-1 py-6 px-3 space-y-1"
+        :class="isCollapsed && !sidebarOpen ? 'overflow-visible' : 'overflow-y-auto'"
+      >
         <Link
-          :href="studentsPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isStudentsActive }"
+          v-for="item in navItems"
+          :key="item.label"
+          :href="item.href"
+          class="group relative flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': item.active }"
         >
-          <UsersIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Students</span>
-        </Link>
+          <component
+            :is="item.icon"
+            class="w-5 h-5 flex-none text-slate-400 group-hover:text-slate-700 transition-colors"
+          />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">{{ item.label }}</span>
 
-        <Link
-          :href="assessmentsPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isAssessmentsActive }"
-        >
-          <ChartBarIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Assessments</span>
-        </Link>
-
-        <Link
-          :href="topicsPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isTopicsActive }"
-        >
-          <BookOpenIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Topics</span>
-        </Link>
-
-        <Link
-          :href="questionnairesPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuestionnairesActive }"
-        >
-          <ClipboardDocumentListIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Questionnaires</span>
-        </Link>
-
-        <Link
-          :href="questionsPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuestionsActive }"
-        >
-          <DocumentTextIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Questions</span>
-        </Link>
-
-        <!-- Quarterly CSV nav hidden while structured assessments are the source of truth. -->
-        <!-- <Link
-          :href="route('quarterly-assessments.index')"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuarterlyActive }"
-        >
-          <FolderIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Quarterly CSV</span>
-        </Link> -->
-
-        <Link
-          :href="route('login-tracker.index')"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isLoginTrackerActive }"
-        >
-          <ClockIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Login Tracker</span>
-        </Link>
-
-        <Link
-          :href="settingsPath"
-          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
-          :class="{ 'bg-slate-100 text-slate-900 shadow': isSettingsActive }"
-        >
-          <Cog6ToothIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
-          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Settings</span>
+          <!-- Tooltip when collapsed -->
+          <span
+            v-if="isCollapsed && !sidebarOpen"
+            class="pointer-events-none absolute left-full top-1/2 z-[60] ml-3 -translate-y-1/2 whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+          >
+            {{ item.label }}
+          </span>
         </Link>
       </nav>
 
