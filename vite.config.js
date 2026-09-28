@@ -10,6 +10,11 @@ export default defineConfig({
         }),
         vue({
             template: {
+                compilerOptions: {
+                    // MathLive registers this element at runtime; Vue must not
+                    // try to resolve it as a component.
+                    isCustomElement: (tag) => tag === 'math-field',
+                },
                 transformAssetUrls: {
                     base: null,
                     includeAbsolute: false,

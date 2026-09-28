@@ -2,13 +2,6 @@
 
 namespace Database\Seeders;
 
-use Database\Seeders\AssessmentTypeSeeder;
-use Database\Seeders\GradeLevelSectionSeeder;
-use Database\Seeders\LearnerSeeder;
-use Database\Seeders\QuarterSeeder;
-use Database\Seeders\SchoolYearSeeder;
-use Database\Seeders\StudentPasswordSeeder;
-use Database\Seeders\UserSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -29,6 +22,7 @@ class DatabaseSeeder extends Seeder
             StudentPasswordSeeder::class,
             // LearnerSeeder::class,
             AssessmentTypeSeeder::class,
+            SettingSeeder::class,
         ]);
     }
 }

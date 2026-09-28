@@ -19,6 +19,14 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    topics: {
+        type: Array,
+        default: () => [],
+    },
+    questionnaires: {
+        type: Array,
+        default: () => [],
+    },
 });
 </script>
 
@@ -30,6 +38,8 @@ const props = defineProps({
                 :assessment-types="props.assessmentTypes"
                 :quarters="props.quarters"
                 :sections="props.sections"
+                :topics="props.topics"
+                :questionnaires="props.questionnaires"
             />
         </div>
     </MainAuthLayout>

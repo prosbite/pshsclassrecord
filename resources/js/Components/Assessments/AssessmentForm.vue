@@ -22,6 +22,22 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    topics: {
+        type: Array,
+        default: () => [],
+    },
+    questionnaires: {
+        type: Array,
+        default: () => [],
+    },
+    selectedTopicIds: {
+        type: Array,
+        default: () => [],
+    },
+    selectedQuestionnaireIds: {
+        type: Array,
+        default: () => [],
+    },
     assessment: {
         type: Object,
         default: null,
@@ -59,6 +75,8 @@ const form = useForm({
     learner_scores: [],
     assessment_date: normalizeDate(props.assessment?.assessment_date) ?? todayIso,
     perfect_score: props.assessment?.perfect_score ?? 100,
+    topic_ids: [...(props.selectedTopicIds ?? [])],
+    questionnaire_ids: [...(props.selectedQuestionnaireIds ?? [])],
 });
 
 const currentUserName = computed(
@@ -395,12 +413,88 @@ const canSubmit = computed(
         !form.processing
 );
 
+const chosenTopicIds = ref([...(props.selectedTopicIds ?? [])]);
+const chosenQuestionnaireIds = ref([...(props.selectedQuestionnaireIds ?? [])]);
+
+const questionnaireById = computed(() =>
+    Object.fromEntries(props.questionnaires.map((questionnaire) => [questionnaire.id, questionnaire]))
+);
+
+const selectedQuestionnaireList = computed(() =>
+    chosenQuestionnaireIds.value
+        .map((id) => questionnaireById.value[id])
+        .filter(Boolean)
+);
+
+const groupedSelectedQuestionnaires = computed(() => {
+    const groups = new Map();
+
+    selectedQuestionnaireList.value.forEach((questionnaire) => {
+        const key = questionnaire.topic_id ?? 0;
+
+        if (!groups.has(key)) {
+            groups.set(key, {
+                topic_id: key,
+                topic_name: questionnaire.topic?.name ?? 'Uncategorized',
+                questionnaires: [],
+            });
+        }
+
+        groups.get(key).questionnaires.push(questionnaire);
+    });
+
+    return [...groups.values()];
+});
+
+const availableQuestionnaires = computed(() =>
+    props.questionnaires.filter((questionnaire) => !chosenQuestionnaireIds.value.includes(questionnaire.id))
+);
+
+const isTopicSelected = (topicId) => chosenTopicIds.value.includes(topicId);
+
+const toggleTopic = (topicId) => {
+    const topicQuestionnaireIds = props.questionnaires
+        .filter((questionnaire) => questionnaire.topic_id === topicId)
+        .map((questionnaire) => questionnaire.id);
+
+    if (isTopicSelected(topicId)) {
+        chosenTopicIds.value = chosenTopicIds.value.filter((id) => id !== topicId);
+        chosenQuestionnaireIds.value = chosenQuestionnaireIds.value.filter(
+            (id) => !topicQuestionnaireIds.includes(id)
+        );
+
+        return;
+    }
+
+    chosenTopicIds.value = [...chosenTopicIds.value, topicId];
+    chosenQuestionnaireIds.value = [
+        ...new Set([...chosenQuestionnaireIds.value, ...topicQuestionnaireIds]),
+    ];
+};
+
+const addQuestionnaire = (event) => {
+    const id = Number(event.target.value);
+
+    if (id && !chosenQuestionnaireIds.value.includes(id)) {
+        chosenQuestionnaireIds.value = [...chosenQuestionnaireIds.value, id];
+    }
+
+    event.target.value = '';
+};
+
+const removeQuestionnaire = (id) => {
+    chosenQuestionnaireIds.value = chosenQuestionnaireIds.value.filter((questionnaireId) => questionnaireId !== id);
+};
+
 const handleSubmit = () => {
     form.learner_scores = Object.entries(learnerScores).map(([learnerId, score]) => ({
         learner_id: Number(learnerId),
         score: score === '' || score === null ? 0 : Number(score),
         tentative: Boolean(learnerTentatives[learnerId]),
     }));
+
+    form.topic_ids = [...chosenTopicIds.value];
+    form.questionnaire_ids = [...chosenQuestionnaireIds.value];
 
     if (isEdit.value) {
         form.put(route('assessments.update', props.assessment.id), {
@@ -674,6 +768,90 @@ const heading = computed(() => (isEdit.value
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <div class="rounded-3xl border border-slate-100 bg-slate-50 p-6 shadow-inner space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Exercise questionnaires</p>
+                    <p class="text-sm text-slate-600">
+                        Choose the questionnaires disseminated to failing learners. Selecting a topic adds all of its questionnaires; remove any you don't want.
+                    </p>
+                </div>
+
+                <div v-if="props.topics.length" class="space-y-2">
+                    <p class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">Topics</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="topic in props.topics"
+                            :key="topic.id"
+                            type="button"
+                            class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-widest transition"
+                            :class="isTopicSelected(topic.id)
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+                            @click="toggleTopic(topic.id)"
+                        >
+                            {{ topic.name }}
+                        </button>
+                    </div>
+                </div>
+                <p v-else class="text-xs text-slate-500">
+                    No topics exist yet. Create topics and questionnaires in the exercise bank first.
+                </p>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <label class="block">
+                        <span class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">Add questionnaire</span>
+                        <select
+                            class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+                            @change="addQuestionnaire"
+                        >
+                            <option value="">
+                                {{ availableQuestionnaires.length ? 'Select a questionnaire…' : 'All questionnaires selected' }}
+                            </option>
+                            <option
+                                v-for="questionnaire in availableQuestionnaires"
+                                :key="questionnaire.id"
+                                :value="questionnaire.id"
+                            >
+                                {{ questionnaire.topic?.name ? `${questionnaire.topic.name} · ` : '' }}{{ questionnaire.title }}
+                            </option>
+                        </select>
+                    </label>
+                    <div class="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                        <span class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">Selected</span>
+                        <p class="mt-1 text-lg font-semibold text-slate-900">
+                            {{ chosenQuestionnaireIds.length }} questionnaire{{ chosenQuestionnaireIds.length === 1 ? '' : 's' }}
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="!groupedSelectedQuestionnaires.length" class="text-xs text-slate-500">
+                    No questionnaires selected.
+                </div>
+                <div v-else class="space-y-4">
+                    <div v-for="group in groupedSelectedQuestionnaires" :key="group.topic_id" class="space-y-2">
+                        <p class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">{{ group.topic_name }}</p>
+                        <ul class="space-y-2">
+                            <li
+                                v-for="questionnaire in group.questionnaires"
+                                :key="questionnaire.id"
+                                class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-2"
+                            >
+                                <span class="text-sm text-slate-800">{{ questionnaire.title }}</span>
+                                <button
+                                    type="button"
+                                    class="text-xs font-semibold uppercase tracking-widest text-rose-600 hover:text-rose-700"
+                                    @click="removeQuestionnaire(questionnaire.id)"
+                                >
+                                    Remove
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <InputError :message="form.errors.topic_ids" class="mt-1" />
+                <InputError :message="form.errors.questionnaire_ids" class="mt-1" />
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">

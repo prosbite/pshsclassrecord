@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Assessment extends Model
 {
@@ -59,5 +60,24 @@ class Assessment extends Model
         return $this->belongsToMany(Learner::class, 'assessment_learners')
             ->withPivot('score', 'tentative')
             ->withTimestamps();
+    }
+
+    public function topics(): BelongsToMany
+    {
+        return $this->belongsToMany(Topic::class, 'assessment_topic')
+            ->withTimestamps();
+    }
+
+    public function questionnaires(): BelongsToMany
+    {
+        return $this->belongsToMany(Questionnaire::class, 'assessment_questionnaire')
+            ->withPivot('position')
+            ->withTimestamps()
+            ->orderByPivot('position');
+    }
+
+    public function exerciseSessions(): HasMany
+    {
+        return $this->hasMany(ExerciseSession::class);
     }
 }

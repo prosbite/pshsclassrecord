@@ -7,6 +7,10 @@ import {
   FolderIcon,
   ChartBarIcon,
   ClockIcon,
+  BookOpenIcon,
+  ClipboardDocumentListIcon,
+  DocumentTextIcon,
+  Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon
 } from '@heroicons/vue/24/outline'
@@ -43,9 +47,17 @@ const isQuarterlyActive = computed(() =>
 const studentsPath = normalizePath(route('students'))
 const assessmentsPath = normalizePath(route('assessments.index'))
 const loginTrackerPath = normalizePath(route('login-tracker.index'))
+const topicsPath = normalizePath(route('topics.index'))
+const questionnairesPath = normalizePath(route('questionnaires.index'))
+const questionsPath = normalizePath(route('questions.index'))
+const settingsPath = normalizePath(route('settings.edit'))
 const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
 const isLoginTrackerActive = computed(() => currentPath.value.startsWith(loginTrackerPath))
+const isTopicsActive = computed(() => currentPath.value.startsWith(topicsPath))
+const isQuestionnairesActive = computed(() => currentPath.value.startsWith(questionnairesPath))
+const isQuestionsActive = computed(() => currentPath.value.startsWith(questionsPath))
+const isSettingsActive = computed(() => currentPath.value.startsWith(settingsPath))
 
 const sidebarOpen = ref(false)
 const isCollapsed = ref(true)
@@ -151,6 +163,33 @@ const toggleCollapse = () => {
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Assessments</span>
         </Link>
 
+        <Link
+          :href="topicsPath"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isTopicsActive }"
+        >
+          <BookOpenIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Topics</span>
+        </Link>
+
+        <Link
+          :href="questionnairesPath"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuestionnairesActive }"
+        >
+          <ClipboardDocumentListIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Questionnaires</span>
+        </Link>
+
+        <Link
+          :href="questionsPath"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isQuestionsActive }"
+        >
+          <DocumentTextIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Questions</span>
+        </Link>
+
         <!-- Quarterly CSV nav hidden while structured assessments are the source of truth. -->
         <!-- <Link
           :href="route('quarterly-assessments.index')"
@@ -168,6 +207,15 @@ const toggleCollapse = () => {
         >
           <ClockIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
           <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Login Tracker</span>
+        </Link>
+
+        <Link
+          :href="settingsPath"
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-slate-100 transition-all group"
+          :class="{ 'bg-slate-100 text-slate-900 shadow': isSettingsActive }"
+        >
+          <Cog6ToothIcon class="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <span v-if="!isCollapsed || sidebarOpen" class="text-sm font-medium">Settings</span>
         </Link>
       </nav>
 

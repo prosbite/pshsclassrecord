@@ -1,3 +1,4 @@
+import 'katex/dist/katex.min.css';
 import '../css/app.css';
 import './bootstrap';
 

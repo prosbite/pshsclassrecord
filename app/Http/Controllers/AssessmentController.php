@@ -34,11 +34,18 @@ class AssessmentController extends Controller
         $learnerScores = collect($data['learner_scores'] ?? []);
         unset($data['learner_scores']);
 
+        $topicIds = $data['topic_ids'] ?? [];
+        $questionnaireIds = $data['questionnaire_ids'] ?? [];
+        unset($data['topic_ids'], $data['questionnaire_ids']);
+
         $assessment = Assessment::create($data);
 
         if ($learnerScores->isNotEmpty()) {
             $assessment->learners()->sync($this->pivotPayload($learnerScores));
         }
+
+        $assessment->topics()->sync($topicIds);
+        $assessment->questionnaires()->sync($this->positionPayload($questionnaireIds));
 
         $assessment->load($this->loadRelations());
 
@@ -87,12 +94,24 @@ class AssessmentController extends Controller
 
         $data['perfect_score'] = $data['perfect_score'] ?? 100;
 
+        $topicIds = $data['topic_ids'] ?? null;
+        $questionnaireIds = $data['questionnaire_ids'] ?? null;
+        unset($data['topic_ids'], $data['questionnaire_ids']);
+
         $assessment->update($data);
 
         // Non-destructive: an empty payload is a no-op, and learners outside the
         // submitted set keep their existing scores instead of being detached.
         if (is_array($learnerScores) && $learnerScores !== []) {
             $assessment->learners()->syncWithoutDetaching($this->pivotPayload(collect($learnerScores)));
+        }
+
+        if ($request->has('topic_ids')) {
+            $assessment->topics()->sync($topicIds ?? []);
+        }
+
+        if ($request->has('questionnaire_ids')) {
+            $assessment->questionnaires()->sync($this->positionPayload($questionnaireIds ?? []));
         }
 
         $assessment->load($this->loadRelations());
@@ -127,5 +146,19 @@ class AssessmentController extends Controller
                 'tentative' => (bool) ($item['tentative'] ?? false),
             ],
         ])->toArray();
+    }
+
+    /**
+     * Build a sync payload that stores each id's array order as its pivot position.
+     *
+     * @param  array<int, int|string>  $ids
+     * @return array<int, array<string, int>>
+     */
+    private function positionPayload(array $ids): array
+    {
+        return collect($ids)
+            ->values()
+            ->mapWithKeys(fn ($id, $index) => [(int) $id => ['position' => $index]])
+            ->toArray();
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assessment;
+use App\Models\ExerciseSession;
 use App\Models\Learner;
 use App\Models\SchoolYear;
 use Illuminate\Http\Request;
@@ -18,8 +19,25 @@ class StudentDashboardController extends Controller
         $learner = $user?->learner;
         $section = null;
         $assessments = collect();
+        $remediationByAssessment = [];
+        $remediationSummary = ['ongoing' => 0, 'completed' => 0];
 
         if ($learner) {
+            $learner->exerciseSessions()
+                ->get()
+                ->each(function (ExerciseSession $session) use (&$remediationByAssessment, &$remediationSummary) {
+                    $remediationByAssessment[$session->assessment_id] = [
+                        'id' => $session->id,
+                        'status' => $session->status,
+                    ];
+
+                    if ($session->status === 'completed') {
+                        $remediationSummary['completed']++;
+                    } else {
+                        $remediationSummary['ongoing']++;
+                    }
+                });
+
             $enrollmentQuery = $learner->enrollments()->with(['section.gradeLevel']);
 
             if ($schoolYear) {
@@ -64,6 +82,8 @@ class StudentDashboardController extends Controller
                 'year_end' => $schoolYear->year_end,
             ] : null,
             'assessments' => $assessments->values()->all(),
+            'remediationByAssessment' => $remediationByAssessment,
+            'remediationSummary' => $remediationSummary,
         ]);
     }
 

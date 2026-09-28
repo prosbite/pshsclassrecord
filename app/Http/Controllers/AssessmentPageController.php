@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Assessment;
 use App\Models\AssessmentType;
 use App\Models\Quarter;
+use App\Models\Questionnaire;
 use App\Models\SchoolYear;
 use App\Models\Section;
+use App\Models\Topic;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -85,7 +87,15 @@ class AssessmentPageController extends Controller
 
     public function edit(Assessment $assessment)
     {
-        $assessment->load(['assessmentType', 'quarter', 'schoolYear', 'section.gradeLevel', 'learners']);
+        $assessment->load([
+            'assessmentType',
+            'quarter',
+            'schoolYear',
+            'section.gradeLevel',
+            'learners',
+            'topics',
+            'questionnaires.topic',
+        ]);
 
         $learnerScores = $assessment->learners->mapWithKeys(fn ($learner) => [
             (string) $learner->id => $learner->pivot->score,
@@ -100,6 +110,8 @@ class AssessmentPageController extends Controller
             'assessment' => $assessment,
             'learnerScores' => $learnerScores,
             'learnerTentatives' => $learnerTentatives,
+            'selectedTopicIds' => $assessment->topics->pluck('id')->values(),
+            'selectedQuestionnaireIds' => $assessment->questionnaires->pluck('id')->values(),
         ]);
     }
 
@@ -148,6 +160,12 @@ class AssessmentPageController extends Controller
                 ->orderBy('grade_level_id')
                 ->orderBy('section_name')
                 ->get(),
+            'topics' => Topic::orderBy('name')->get(['id', 'name']),
+            'questionnaires' => Questionnaire::with('topic')
+                ->orderBy('topic_id')
+                ->orderBy('position')
+                ->orderBy('title')
+                ->get(['id', 'topic_id', 'title']),
         ];
     }
 
