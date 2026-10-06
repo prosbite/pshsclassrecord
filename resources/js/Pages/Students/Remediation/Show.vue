@@ -63,8 +63,14 @@ const groups = computed(() => {
 });
 
 const title = computed(
-    () => props.session.assessment?.title || props.session.assessment?.type || 'Preventive exercise',
+    () => props.session.assessment?.title || props.session.assessment?.type || 'Exercise',
 );
+
+const kindLabel = computed(() => (props.session.kind === 'enhancement' ? 'Enhancement' : 'Preventive'));
+
+const kindClasses = computed(() => (props.session.kind === 'enhancement'
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-indigo-100 text-indigo-700'));
 
 const percentLabel = computed(() =>
     props.session.percent !== null && props.session.percent !== undefined ? `${props.session.percent}%` : '—',
@@ -103,8 +109,16 @@ const submit = () => {
         <div class="space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
                 <div>
-                    <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Preventive Exercises</p>
-                    <h1 class="text-2xl font-semibold text-slate-900">{{ title }}</h1>
+                    <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Exercises</p>
+                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                        <h1 class="text-2xl font-semibold text-slate-900">{{ title }}</h1>
+                        <span
+                            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                            :class="kindClasses"
+                        >
+                            {{ kindLabel }}
+                        </span>
+                    </div>
                     <p class="mt-1 text-sm text-slate-500">
                         <span v-if="session.assessment?.type">{{ session.assessment.type }}</span>
                         <span v-if="session.assessment?.quarter"> · Quarter {{ session.assessment.quarter }}</span>
@@ -114,7 +128,7 @@ const submit = () => {
                     :href="route('student.remediation.index')"
                     class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:bg-slate-50"
                 >
-                    Back to preventive exercises
+                    Back to exercises
                 </Link>
             </div>
 

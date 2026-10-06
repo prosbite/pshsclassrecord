@@ -14,11 +14,16 @@ class ExerciseSession extends Model
     /** @use HasFactory<ExerciseSessionFactory> */
     use HasFactory;
 
+    public const KIND_PREVENTIVE = 'preventive';
+
+    public const KIND_ENHANCEMENT = 'enhancement';
+
     protected $fillable = [
         'assessment_id',
         'learner_id',
         'created_by',
         'status',
+        'kind',
         'remark',
         'completed_at',
         'submitted_at',

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import MainAuthLayout from '@/Layouts/MainAuthLayout.vue';
 
@@ -38,16 +38,33 @@ const props = defineProps({
     },
 });
 
-const selectedLearnerIds = ref(
-    props.failingLearners.filter((row) => row.is_failing && row.learner).map((row) => row.learner.id)
-);
+const defaultLearnerSelection = (kind) => (kind === 'preventive'
+    ? props.failingLearners.filter((row) => row.is_failing && row.learner).map((row) => row.learner.id)
+    : []);
+
+const selectedLearnerIds = ref(defaultLearnerSelection('preventive'));
 
 const selectedQuestionnaireIds = ref(props.poolQuestionnaires.map((questionnaire) => questionnaire.id));
 
 const form = useForm({
     learner_ids: [],
     questionnaire_ids: [],
+    kind: 'preventive',
 });
+
+watch(
+    () => form.kind,
+    (kind) => {
+        selectedLearnerIds.value = defaultLearnerSelection(kind);
+    },
+);
+
+const kindLabel = (kind) => (kind === 'enhancement' ? 'Enhancement' : 'Preventive');
+
+const kindClasses = (kind) => ({
+    preventive: 'bg-indigo-100 text-indigo-700',
+    enhancement: 'bg-emerald-100 text-emerald-700',
+}[kind] ?? 'bg-slate-100 text-slate-600');
 
 const learnerName = (learner) =>
     [learner?.last_name, learner?.first_name, learner?.middle_name ? `${learner.middle_name.charAt(0)}.` : '']
@@ -116,7 +133,7 @@ const confirmDeleteAllSessions = () => {
         return;
     }
 
-    if (!window.confirm(`Delete all ${props.sessions.length} preventive exercise session(s) for this assessment? This cannot be undone.`)) {
+    if (!window.confirm(`Delete all ${props.sessions.length} exercise session(s) for this assessment? This cannot be undone.`)) {
         return;
     }
 
@@ -141,7 +158,7 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
         <div class="space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-lg sm:p-8">
                 <div>
-                    <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Preventive Exercises</p>
+                    <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Exercises</p>
                     <h1 class="text-2xl font-semibold text-slate-900">{{ title }}</h1>
                     <p class="text-sm text-slate-500">
                         {{ assessment.section?.section_name || 'Section' }} · Passing threshold {{ threshold }}%
@@ -188,7 +205,13 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
             <div class="rounded-3xl bg-white p-6 shadow-lg sm:p-8">
                 <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Learners</p>
                 <p class="text-sm text-slate-500">
-                    Failing learners are pre-selected. Tentative scores are marked but never auto-selected.
+                    <template v-if="form.kind === 'preventive'">
+                        Failing learners are pre-selected. Tentative scores are marked but never auto-selected.
+                    </template>
+                    <template v-else>
+                        Enhancement learners are not pre-selected — choose who to assign.
+                    </template>
+                    Changing the exercise type resets this selection.
                     <span class="font-semibold text-slate-700">
                         {{ selectedCount }} of {{ selectableLearnerIds.length }} selected.
                     </span>
@@ -273,6 +296,31 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
                     Each selected learner gets one session with the chosen questionnaires. Existing sessions are skipped.
                 </p>
 
+                <div class="mt-5">
+                    <span class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Exercise type</span>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <label
+                            v-for="option in [
+                                { value: 'preventive', label: 'Preventive' },
+                                { value: 'enhancement', label: 'Enhancement' },
+                            ]"
+                            :key="option.value"
+                            class="flex cursor-pointer items-center gap-2 rounded-2xl border px-4 py-2 text-sm transition"
+                            :class="form.kind === option.value
+                                ? 'border-slate-400 bg-slate-100 font-semibold text-slate-900'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+                        >
+                            <input
+                                v-model="form.kind"
+                                type="radio"
+                                class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-slate-500"
+                                :value="option.value"
+                            />
+                            {{ option.label }}
+                        </label>
+                    </div>
+                </div>
+
                 <div v-if="bankQuestionnaires.length" class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     <label
                         v-for="questionnaire in bankQuestionnaires"
@@ -338,6 +386,7 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
                     <thead class="bg-slate-50 text-slate-500">
                         <tr>
                             <th class="px-6 py-3 font-semibold">Learner</th>
+                            <th class="px-6 py-3 font-semibold text-center">Kind</th>
                             <th class="px-6 py-3 font-semibold text-center">Questionnaires</th>
                             <th class="px-6 py-3 font-semibold text-center">Answered</th>
                             <th class="px-6 py-3 font-semibold text-center">Attempted</th>
@@ -353,6 +402,14 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
                             class="border-b last:border-b-0 odd:bg-white even:bg-slate-50"
                         >
                             <td class="px-6 py-4 font-semibold text-slate-900">{{ learnerName(session.learner) }}</td>
+                            <td class="px-6 py-4 text-center">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                                    :class="kindClasses(session.kind)"
+                                >
+                                    {{ kindLabel(session.kind) }}
+                                </span>
+                            </td>
                             <td class="px-6 py-4 text-center text-slate-700">{{ (session.questionnaires || []).length }}</td>
                             <td class="px-6 py-4 text-center text-slate-700">
                                 {{ session.answered_count ?? 0 }} / {{ (session.session_questions || []).length }}

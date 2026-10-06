@@ -54,7 +54,7 @@ const gradeLabel = computed(() => props.assessment.section?.grade_level?.grade_l
                 :href="route('assessments.remediation', assessment.id)"
                 class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
             >
-                Preventive Exercises
+                Exercises
             </Link>
             <button
                 type="button"

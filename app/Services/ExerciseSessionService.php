@@ -19,8 +19,13 @@ class ExerciseSessionService
      *
      * @param  array<int, int|string>  $questionnaireIds
      */
-    public function createFor(Assessment $assessment, Learner $learner, array $questionnaireIds, ?int $userId): ExerciseSession
-    {
+    public function createFor(
+        Assessment $assessment,
+        Learner $learner,
+        array $questionnaireIds,
+        ?int $userId,
+        string $kind = ExerciseSession::KIND_PREVENTIVE,
+    ): ExerciseSession {
         $session = ExerciseSession::firstOrCreate(
             [
                 'assessment_id' => $assessment->id,
@@ -29,6 +34,7 @@ class ExerciseSessionService
             [
                 'created_by' => $userId,
                 'status' => 'assigned',
+                'kind' => $kind,
             ]
         );
 

@@ -231,6 +231,49 @@ test('sessions can be created for any learner in the section', function () {
         ->exists())->toBeTrue();
 });
 
+test('sessions default to preventive but accept an explicit enhancement kind', function () {
+    addRemediationQuestion($this->questionnaire, ['prompt_text' => 'Item 1']);
+
+    $this->actingAs($this->admin)->post(
+        route('assessments.remediation.sessions.store', $this->assessment),
+        [
+            'learner_ids' => [$this->learners[0]->id],
+            'questionnaire_ids' => [$this->questionnaire->id],
+        ]
+    )->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    $this->actingAs($this->admin)->post(
+        route('assessments.remediation.sessions.store', $this->assessment),
+        [
+            'learner_ids' => [$this->learners[1]->id],
+            'questionnaire_ids' => [$this->questionnaire->id],
+            'kind' => 'enhancement',
+        ]
+    )->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    expect(ExerciseSession::where('assessment_id', $this->assessment->id)
+        ->where('learner_id', $this->learners[0]->id)
+        ->value('kind'))->toBe('preventive')
+        ->and(ExerciseSession::where('assessment_id', $this->assessment->id)
+            ->where('learner_id', $this->learners[1]->id)
+            ->value('kind'))->toBe('enhancement');
+});
+
+test('an invalid exercise kind is rejected', function () {
+    addRemediationQuestion($this->questionnaire, ['prompt_text' => 'Item 1']);
+
+    $this->actingAs($this->admin)->post(
+        route('assessments.remediation.sessions.store', $this->assessment),
+        [
+            'learner_ids' => [$this->learners[0]->id],
+            'questionnaire_ids' => [$this->questionnaire->id],
+            'kind' => 'remedial',
+        ]
+    )->assertSessionHasErrors('kind');
+
+    expect(ExerciseSession::where('assessment_id', $this->assessment->id)->count())->toBe(0);
+});
+
 test('creating sessions snapshots questions and skips duplicates', function () {
     addRemediationQuestions($this->questionnaire, 2);
 
@@ -248,6 +291,7 @@ test('creating sessions snapshots questions and skips duplicates', function () {
         ->first();
 
     expect($session)->not->toBeNull()
+        ->and($session->kind)->toBe('preventive')
         ->and($session->sessionQuestions)->toHaveCount(2)
         ->and($session->questionnaires)->toHaveCount(1);
 

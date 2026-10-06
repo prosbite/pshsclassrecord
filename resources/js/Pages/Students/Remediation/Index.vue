@@ -16,9 +16,15 @@ const props = defineProps({
 
 const hasAny = computed(() => props.ongoing.length > 0 || props.completed.length > 0);
 
-const assessmentTitle = (row) => row.assessment?.title || row.assessment?.type || 'Preventive exercise';
+const assessmentTitle = (row) => row.assessment?.title || row.assessment?.type || 'Exercise';
 
 const quarterLabel = (row) => (row.assessment?.quarter ? `Quarter ${row.assessment.quarter}` : null);
+
+const kindLabel = (row) => (row.kind === 'enhancement' ? 'Enhancement' : 'Preventive');
+
+const kindClasses = (row) => (row.kind === 'enhancement'
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-indigo-100 text-indigo-700');
 
 const statusClasses = (status) => ({
     assigned: 'bg-amber-100 text-amber-700',
@@ -38,7 +44,7 @@ const percentLabel = (row) =>
 
 <template>
     <StudentLayout>
-        <Head title="Preventive Exercises" />
+        <Head title="Exercises" />
 
         <div class="space-y-8">
             <div class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
@@ -46,9 +52,9 @@ const percentLabel = (row) =>
                     <div>
                         <div class="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1">
                             <div class="h-2 w-2 rounded-full bg-indigo-500"></div>
-                            <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Preventive Exercises</p>
+                            <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Exercises</p>
                         </div>
-                        <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Your Preventive Exercises</h2>
+                        <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Your Exercises</h2>
                         <p class="mt-2 text-sm text-slate-500">
                             Answer the exercises your teacher assigned and track their progress here.
                         </p>
@@ -63,7 +69,7 @@ const percentLabel = (row) =>
             </div>
 
             <div v-if="!hasAny" class="rounded-3xl border border-slate-100 bg-white p-16 text-center shadow-sm">
-                <p class="text-slate-400">You have no preventive exercises right now.</p>
+                <p class="text-slate-400">You have no exercises right now.</p>
                 <p class="mt-2 text-sm text-slate-500">Check back after your teacher assigns one.</p>
             </div>
 
@@ -81,7 +87,13 @@ const percentLabel = (row) =>
                         >
                             <div class="min-w-0">
                                 <p class="truncate text-base font-semibold text-slate-900">{{ assessmentTitle(row) }}</p>
-                                <p class="mt-1 text-xs uppercase tracking-widest text-slate-400">
+                                <p class="mt-1 flex flex-wrap items-center gap-2 text-xs uppercase tracking-widest text-slate-400">
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wider"
+                                        :class="kindClasses(row)"
+                                    >
+                                        {{ kindLabel(row) }}
+                                    </span>
                                     <span v-if="row.assessment?.type">{{ row.assessment.type }}</span>
                                     <span v-if="quarterLabel(row)"> · {{ quarterLabel(row) }}</span>
                                 </p>
@@ -123,7 +135,13 @@ const percentLabel = (row) =>
                         >
                             <div class="min-w-0">
                                 <p class="truncate text-base font-semibold text-slate-900">{{ assessmentTitle(row) }}</p>
-                                <p class="mt-1 text-xs uppercase tracking-widest text-slate-400">
+                                <p class="mt-1 flex flex-wrap items-center gap-2 text-xs uppercase tracking-widest text-slate-400">
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wider"
+                                        :class="kindClasses(row)"
+                                    >
+                                        {{ kindLabel(row) }}
+                                    </span>
                                     <span v-if="row.assessment?.type">{{ row.assessment.type }}</span>
                                     <span v-if="quarterLabel(row)"> · {{ quarterLabel(row) }}</span>
                                 </p>

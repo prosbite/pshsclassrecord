@@ -29,6 +29,12 @@ const props = defineProps({
 const pending = computed(() => props.remediation.pending ?? []);
 const awaitingCount = computed(() => props.remediation.submitted ?? 0);
 
+const kindLabel = (kind) => (kind === 'enhancement' ? 'Enhancement' : 'Preventive');
+
+const kindClasses = (kind) => (kind === 'enhancement'
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-indigo-100 text-indigo-700');
+
 const threshold = computed(() => Number(props.summary.passing_threshold ?? 0));
 
 const statCards = computed(() => [
@@ -56,7 +62,7 @@ const statCards = computed(() => [
     {
         label: 'Awaiting Marking',
         value: awaitingCount.value,
-        hint: awaitingCount.value > 0 ? 'Submitted preventive exercises' : 'Nothing pending',
+        hint: awaitingCount.value > 0 ? 'Submitted exercises' : 'Nothing pending',
         accent: awaitingCount.value > 0 ? 'text-amber-600' : 'text-slate-900',
         href: '#awaiting-marking',
     },
@@ -135,7 +141,7 @@ const assessmentHref = (assessment) =>
                 class="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900"
             >
                 <p class="font-semibold">
-                    {{ awaitingCount }} preventive exercise{{ awaitingCount === 1 ? '' : 's' }} submitted and awaiting marking.
+                    {{ awaitingCount }} exercise{{ awaitingCount === 1 ? '' : 's' }} submitted and awaiting marking.
                 </p>
                 <p class="mt-1">
                     Open each session to review the learner's answers, adjust scores, and mark it completed.
@@ -162,7 +168,7 @@ const assessmentHref = (assessment) =>
                     <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                         <div>
                             <p class="text-sm font-bold uppercase tracking-widest text-slate-500">Awaiting marking</p>
-                            <p class="text-xs text-slate-400">Submitted preventive exercises, newest first.</p>
+                            <p class="text-xs text-slate-400">Submitted exercises, newest first.</p>
                         </div>
                         <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                             {{ pending.length }}
@@ -179,8 +185,14 @@ const assessmentHref = (assessment) =>
                                 <p class="truncate text-sm font-semibold text-slate-900">
                                     {{ session.learner?.name ?? 'Learner' }}
                                 </p>
-                                <p class="mt-0.5 truncate text-xs text-slate-500">
-                                    {{ session.assessment_title || session.type || 'Preventive exercise' }}
+                                <p class="mt-0.5 flex flex-wrap items-center gap-1 truncate text-xs text-slate-500">
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                                        :class="kindClasses(session.kind)"
+                                    >
+                                        {{ kindLabel(session.kind) }}
+                                    </span>
+                                    <span>{{ session.assessment_title || session.type || 'Exercise' }}</span>
                                     <span v-if="session.section"> · {{ session.section }}</span>
                                     <span v-if="session.quarter"> · Q{{ session.quarter }}</span>
                                 </p>
@@ -263,7 +275,7 @@ const assessmentHref = (assessment) =>
                 </div>
 
                 <div class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                    <p class="text-sm font-bold uppercase tracking-widest text-slate-500">Preventive exercises</p>
+                    <p class="text-sm font-bold uppercase tracking-widest text-slate-500">Exercises</p>
                     <div class="mt-4 space-y-3">
                         <div
                             v-for="row in exerciseProgress"

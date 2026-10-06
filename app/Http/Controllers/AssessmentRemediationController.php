@@ -59,7 +59,10 @@ class AssessmentRemediationController extends Controller
             'learner_ids.*' => ['integer', 'exists:learners,id'],
             'questionnaire_ids' => ['required', 'array', 'min:1'],
             'questionnaire_ids.*' => ['integer', 'exists:questionnaires,id'],
+            'kind' => ['nullable', 'in:preventive,enhancement'],
         ]);
+
+        $kind = $data['kind'] ?? ExerciseSession::KIND_PREVENTIVE;
 
         $learnerIds = collect($data['learner_ids'])->map(fn ($id) => (int) $id)->unique()->values();
         $questionnaireIds = collect($data['questionnaire_ids'])->map(fn ($id) => (int) $id)->unique()->values();
@@ -88,11 +91,11 @@ class AssessmentRemediationController extends Controller
                 continue;
             }
 
-            $this->sessions->createFor($assessment, $learner, $questionnaireIds->all(), $request->user()->id);
+            $this->sessions->createFor($assessment, $learner, $questionnaireIds->all(), $request->user()->id, $kind);
             $created++;
         }
 
-        $message = "{$created} session".($created === 1 ? '' : 's').' created';
+        $message = "{$created} {$kind} session".($created === 1 ? '' : 's').' created';
 
         if ($skipped > 0) {
             $message .= ", {$skipped} skipped (already assigned)";

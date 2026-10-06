@@ -26,11 +26,17 @@ const props = defineProps({
 
 const remediationFor = (assessmentId) => props.remediationByAssessment?.[assessmentId] ?? null;
 
-const remediationTagLabel = (status) => ({
-    assigned: 'Preventive exercise available',
-    submitted: 'Preventive exercise submitted',
-    completed: 'Preventive exercise completed',
-}[status] ?? 'Preventive exercise');
+const remediationKindLabel = (kind) => (kind === 'enhancement' ? 'Enhancement' : 'Preventive');
+
+const remediationTagLabel = (status, kind) => {
+    const base = {
+        assigned: 'Exercise available',
+        submitted: 'Exercise submitted',
+        completed: 'Exercise completed',
+    }[status] ?? 'Exercise';
+
+    return `${base} · ${remediationKindLabel(kind)}`;
+};
 
 const remediationTagClasses = (status) => ({
     assigned: 'bg-amber-100 text-amber-700',
@@ -455,7 +461,7 @@ const finalAdjectival = computed(() =>
                     <div>
                         <div class="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1">
                             <div class="h-2 w-2 rounded-full bg-indigo-500"></div>
-                            <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Preventive Exercises</p>
+                            <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Exercises</p>
                         </div>
                         <div class="mt-4 flex flex-wrap gap-6">
                             <p class="text-sm text-slate-600">
@@ -472,7 +478,7 @@ const finalAdjectival = computed(() =>
                         :href="route('student.remediation.index')"
                         class="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-slate-800"
                     >
-                        View preventive exercises
+                        View exercises
                     </Link>
                 </div>
             </div>
@@ -567,7 +573,7 @@ const finalAdjectival = computed(() =>
                                                 class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition hover:opacity-80"
                                                 :class="remediationTagClasses(remediationFor(item.assessmentId).status)"
                                             >
-                                                {{ remediationTagLabel(remediationFor(item.assessmentId).status) }}
+                                                {{ remediationTagLabel(remediationFor(item.assessmentId).status, remediationFor(item.assessmentId).kind) }}
                                             </Link>
                                         </span>
                                         <div class="text-right">

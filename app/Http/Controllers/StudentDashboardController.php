@@ -29,6 +29,7 @@ class StudentDashboardController extends Controller
                     $remediationByAssessment[$session->assessment_id] = [
                         'id' => $session->id,
                         'status' => $session->status,
+                        'kind' => $session->kind,
                     ];
 
                     if ($session->status === 'completed') {
