@@ -7,17 +7,18 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ExerciseSessionController;
 use App\Http\Controllers\LearnerController;
-use App\Http\Controllers\LoginTrackerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuarterlyAssessmentController;
 use App\Http\Controllers\QuarterlyAssessmentPageController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\QuestionnaireController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SimulationActivityController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\StudentImpersonationController;
 use App\Http\Controllers\StudentRemediationController;
 use App\Http\Controllers\TopicController;
+use App\Http\Controllers\TrackerController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsStudent;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified', EnsureUserIsStudent::class])
     ->group(function () {
         Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->name('student.dashboard');
+        Route::post('/student/simulation', [SimulationActivityController::class, 'store'])->name('student.simulation.store');
         Route::get('/student/remediation', [StudentRemediationController::class, 'index'])->name('student.remediation.index');
         Route::get('/student/remediation/{exerciseSession}', [StudentRemediationController::class, 'show'])->name('student.remediation.show');
         Route::put('/student/remediation/{exerciseSession}', [StudentRemediationController::class, 'submit'])->name('student.remediation.submit');
@@ -63,7 +65,7 @@ Route::prefix('admin')
         Route::delete('/exercise-sessions/{exerciseSession}', [ExerciseSessionController::class, 'destroy'])
             ->name('exercise-sessions.destroy');
         Route::get('/students', [LearnerController::class, 'index'])->name('students');
-        Route::get('/login-tracker', [LoginTrackerController::class, 'index'])->name('login-tracker.index');
+        Route::get('/tracker', [TrackerController::class, 'index'])->name('tracker.index');
         Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
             ->name('students.impersonate');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');
@@ -76,6 +78,8 @@ Route::prefix('admin')
             ->name('assessments.remediation');
         Route::post('/assessments/{assessment}/remediation/sessions', [AssessmentRemediationController::class, 'storeSessions'])
             ->name('assessments.remediation.sessions.store');
+        Route::delete('/assessments/{assessment}/remediation/sessions', [AssessmentRemediationController::class, 'destroySessions'])
+            ->name('assessments.remediation.sessions.destroy');
         Route::get('/assessments/{assessment}/edit', [AssessmentPageController::class, 'edit'])->name('assessments.edit');
         Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
         Route::patch('/assessments/{assessment}', [AssessmentController::class, 'update']);

@@ -375,6 +375,25 @@ test('the student dashboard surfaces remediation status per assessment', functio
         );
 });
 
+test('all preventive exercise sessions for an assessment can be deleted at once', function () {
+    srAddText($this->questionnaire);
+
+    $first = srSession($this, $this->learnerA);
+    $second = srSession($this, $this->learnerB);
+
+    $this->actingAs($this->studentA)
+        ->delete(route('assessments.remediation.sessions.destroy', $this->assessment))
+        ->assertForbidden();
+
+    $this->actingAs($this->admin)
+        ->delete(route('assessments.remediation.sessions.destroy', $this->assessment))
+        ->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    expect(ExerciseSession::where('assessment_id', $this->assessment->id)->count())->toBe(0);
+    $this->assertDatabaseMissing('exercise_session_questions', ['exercise_session_id' => $first->id]);
+    $this->assertDatabaseMissing('exercise_session_questions', ['exercise_session_id' => $second->id]);
+});
+
 test('the admin session page surfaces submitted answers and teacher overrides persist', function () {
     $mcq = srAddMcq($this->questionnaire, ['Alpha', 'Beta'], 0, 2);
     srAddText($this->questionnaire);

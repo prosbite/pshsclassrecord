@@ -102,4 +102,17 @@ class AssessmentRemediationController extends Controller
             ->route('assessments.remediation', $assessment)
             ->with('success', $message);
     }
+
+    public function destroySessions(Assessment $assessment)
+    {
+        $count = $assessment->exerciseSessions()->count();
+
+        $assessment->exerciseSessions()->delete();
+
+        $message = "{$count} session".($count === 1 ? '' : 's').' deleted';
+
+        return redirect()
+            ->route('assessments.remediation', $assessment)
+            ->with('success', $message);
+    }
 }

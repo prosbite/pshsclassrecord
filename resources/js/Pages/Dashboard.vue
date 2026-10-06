@@ -114,10 +114,10 @@ const assessmentHref = (assessment) =>
                             New assessment
                         </Link>
                         <Link
-                            :href="route('login-tracker.index')"
+                            :href="route('tracker.index')"
                             class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:bg-slate-50"
                         >
-                            Login tracker
+                            Tracker
                         </Link>
                         <Link
                             :href="route('settings.edit')"
@@ -283,7 +283,7 @@ const assessmentHref = (assessment) =>
                 <div class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-bold uppercase tracking-widest text-slate-500">Recent logins</p>
-                        <Link :href="route('login-tracker.index')" class="text-[10px] font-semibold uppercase tracking-widest text-sky-600 hover:text-sky-700">
+                        <Link :href="route('tracker.index')" class="text-[10px] font-semibold uppercase tracking-widest text-sky-600 hover:text-sky-700">
                             View all
                         </Link>
                     </div>

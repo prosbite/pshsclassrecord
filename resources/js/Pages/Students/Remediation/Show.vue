@@ -2,6 +2,7 @@
 import { computed, reactive } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
+import MathInsertButton from '@/Components/Exercises/MathInsertButton.vue';
 import MathText from '@/Components/Exercises/MathText.vue';
 
 const props = defineProps({
@@ -21,6 +22,8 @@ const props = defineProps({
 
 const completed = computed(() => props.session.status === 'completed');
 const locked = computed(() => ['submitted', 'completed'].includes(props.session.status));
+
+const hasMath = (text) => /\\\(|\\\[|\$\$/.test(text ?? '');
 
 const answers = reactive({});
 
@@ -219,15 +222,25 @@ const submit = () => {
                                     </div>
 
                                     <div v-else class="mt-4">
-                                        <textarea
-                                            v-model="answers[question.id].response_text"
-                                            rows="4"
-                                            :disabled="locked"
-                                            placeholder="Type your answer…"
-                                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-400 focus:bg-white focus:outline-none disabled:opacity-70"
-                                        ></textarea>
+                                        <div class="flex items-start gap-2">
+                                            <textarea
+                                                v-model="answers[question.id].response_text"
+                                                rows="4"
+                                                :disabled="locked"
+                                                placeholder="Type your answer… Use the √x button to insert equations and symbols."
+                                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-400 focus:bg-white focus:outline-none disabled:opacity-70"
+                                            ></textarea>
+                                            <MathInsertButton v-if="!locked" class="mt-1" />
+                                        </div>
 
-                                        <div v-if="completed && answers[question.id].response_text" class="mt-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                                        <p
+                                            v-if="!locked && hasMath(answers[question.id].response_text)"
+                                            class="mt-2 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+                                        >
+                                            <MathText :content="answers[question.id].response_text" />
+                                        </p>
+
+                                        <div v-if="locked && answers[question.id].response_text" class="mt-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
                                             <MathText :content="answers[question.id].response_text" />
                                         </div>
                                     </div>

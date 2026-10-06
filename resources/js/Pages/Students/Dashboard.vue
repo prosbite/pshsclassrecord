@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
 import {
     buildQuarterResult,
@@ -346,6 +346,19 @@ const detailSegments = ['lt1', 'lt2', 'aa', 'fa'];
 const simulationMode = ref(false);
 const simulationDraft = reactive({});
 
+const toggleSimulation = () => {
+    simulationMode.value = !simulationMode.value;
+
+    if (simulationMode.value) {
+        router.post(route('student.simulation.store'), {
+            quarter: selectedQuarter.value,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }
+};
+
 const clearSimulationDraft = () => {
     Object.keys(simulationDraft).forEach((key) => {
         delete simulationDraft[key];
@@ -479,7 +492,7 @@ const finalAdjectival = computed(() =>
                         :class="simulationMode
                             ? 'ring-2 ring-sky-200 ring-offset-2 ring-offset-white'
                             : ''"
-                        @click="simulationMode = !simulationMode"
+                        @click="toggleSimulation"
                     >
                         {{ simulationMode ? 'Exit Simulation' : 'Simulation Mode' }}
                     </button>

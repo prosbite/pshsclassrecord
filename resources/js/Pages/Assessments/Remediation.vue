@@ -62,6 +62,25 @@ const toggleLearner = (learnerId) => {
     }
 };
 
+const selectableLearnerIds = computed(() =>
+    props.failingLearners
+        .map((row) => row.learner?.id)
+        .filter((id) => id !== null && id !== undefined)
+);
+
+const allLearnersSelected = computed(() =>
+    selectableLearnerIds.value.length > 0
+    && selectableLearnerIds.value.every((id) => selectedLearnerIds.value.includes(id))
+);
+
+const someLearnersSelected = computed(() =>
+    selectedLearnerIds.value.length > 0 && !allLearnersSelected.value
+);
+
+const toggleAllLearners = () => {
+    selectedLearnerIds.value = allLearnersSelected.value ? [] : [...selectableLearnerIds.value];
+};
+
 const toggleQuestionnaire = (questionnaireId) => {
     if (selectedQuestionnaireIds.value.includes(questionnaireId)) {
         selectedQuestionnaireIds.value = selectedQuestionnaireIds.value.filter((id) => id !== questionnaireId);
@@ -88,6 +107,28 @@ const confirmDeleteSession = (session) => {
     }
 
     router.delete(route('exercise-sessions.destroy', session.id), { preserveScroll: true });
+};
+
+const deletingAll = ref(false);
+
+const confirmDeleteAllSessions = () => {
+    if (!props.sessions.length) {
+        return;
+    }
+
+    if (!window.confirm(`Delete all ${props.sessions.length} preventive exercise session(s) for this assessment? This cannot be undone.`)) {
+        return;
+    }
+
+    router.delete(route('assessments.remediation.sessions.destroy', props.assessment.id), {
+        preserveScroll: true,
+        onStart: () => {
+            deletingAll.value = true;
+        },
+        onFinish: () => {
+            deletingAll.value = false;
+        },
+    });
 };
 
 const title = computed(() => props.assessment.title || props.assessment.assessment_type?.name || 'Assessment');
@@ -148,13 +189,28 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
                 <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Learners</p>
                 <p class="text-sm text-slate-500">
                     Failing learners are pre-selected. Tentative scores are marked but never auto-selected.
+                    <span class="font-semibold text-slate-700">
+                        {{ selectedCount }} of {{ selectableLearnerIds.length }} selected.
+                    </span>
                 </p>
 
                 <div class="mt-4 overflow-x-auto">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-slate-50 text-slate-500">
                             <tr>
-                                <th class="px-4 py-3 font-semibold">Assign</th>
+                                <th class="px-4 py-3 font-semibold">
+                                    <label class="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                            :checked="allLearnersSelected"
+                                            :indeterminate="someLearnersSelected"
+                                            :disabled="!selectableLearnerIds.length"
+                                            @change="toggleAllLearners"
+                                        />
+                                        Assign
+                                    </label>
+                                </th>
                                 <th class="px-4 py-3 font-semibold">Learner</th>
                                 <th class="px-4 py-3 font-semibold text-right">Score</th>
                                 <th class="px-4 py-3 font-semibold text-right">Percent</th>
@@ -260,9 +316,20 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
             </div>
 
             <div class="overflow-hidden rounded-3xl bg-white shadow-lg">
-                <div class="px-6 py-5">
-                    <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Sessions</p>
-                    <p class="text-sm text-slate-500">{{ sessions.length }} assigned</p>
+                <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-5">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Sessions</p>
+                        <p class="text-sm text-slate-500">{{ sessions.length }} assigned</p>
+                    </div>
+                    <button
+                        v-if="sessions.length"
+                        type="button"
+                        class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 disabled:opacity-40"
+                        :disabled="deletingAll"
+                        @click="confirmDeleteAllSessions"
+                    >
+                        {{ deletingAll ? 'Deleting…' : 'Delete all' }}
+                    </button>
                 </div>
                 <div v-if="!sessions.length" class="px-6 pb-8 text-sm text-slate-500">
                     No sessions yet.
