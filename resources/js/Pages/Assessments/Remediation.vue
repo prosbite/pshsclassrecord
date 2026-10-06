@@ -38,9 +38,9 @@ const props = defineProps({
     },
 });
 
-const defaultLearnerSelection = (kind) => (kind === 'preventive'
-    ? props.failingLearners.filter((row) => row.is_failing && row.learner).map((row) => row.learner.id)
-    : []);
+const defaultLearnerSelection = (kind) => props.failingLearners
+    .filter((row) => row.learner && (kind === 'preventive' ? row.is_failing : !row.is_failing))
+    .map((row) => row.learner.id);
 
 const selectedLearnerIds = ref(defaultLearnerSelection('preventive'));
 
@@ -209,7 +209,7 @@ const canSubmit = computed(() => selectedCount.value > 0 && selectedQuestionnair
                         Failing learners are pre-selected. Tentative scores are marked but never auto-selected.
                     </template>
                     <template v-else>
-                        Enhancement learners are not pre-selected — choose who to assign.
+                        Passing learners are pre-selected. Tentative scores are marked but never auto-selected.
                     </template>
                     Changing the exercise type resets this selection.
                     <span class="font-semibold text-slate-700">
