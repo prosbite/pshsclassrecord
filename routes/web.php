@@ -72,6 +72,8 @@ Route::prefix('admin')
         Route::delete('/error-logs/{errorLog}', [ErrorLogController::class, 'destroy'])->name('error-logs.destroy');
         Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
             ->name('students.impersonate');
+        Route::post('/students/{enrollment}/reset-password', [StudentImpersonationController::class, 'resetPassword'])
+            ->name('students.reset-password');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');
         Route::post('/students/bulk-update-emails', [EnrollmentController::class, 'bulkUpdateEmails'])->name('students.bulk-update-emails');
         Route::get('/assessments/create', [AssessmentPageController::class, 'create'])->name('assessments.create');

@@ -7,9 +7,15 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class StudentImpersonationController extends Controller
 {
+    /**
+     * Default password assigned when an admin resets a student's password.
+     */
+    private const DEFAULT_STUDENT_PASSWORD = '12345678';
+
     public function store(Request $request, Enrollment $enrollment): RedirectResponse
     {
         $admin = $request->user();
@@ -31,6 +37,24 @@ class StudentImpersonationController extends Controller
         return redirect()
             ->route('student.dashboard')
             ->with('success', "Signed in as {$studentUser->name}.");
+    }
+
+    public function resetPassword(Enrollment $enrollment): RedirectResponse
+    {
+        $studentUser = $enrollment->loadMissing('learner.user')->learner?->user;
+
+        if (! $studentUser) {
+            return redirect()
+                ->route('students')
+                ->with('error', 'This student does not have an account yet.');
+        }
+
+        $studentUser->password = Hash::make(self::DEFAULT_STUDENT_PASSWORD);
+        $studentUser->save();
+
+        return redirect()
+            ->route('students')
+            ->with('success', "Password for {$studentUser->name} has been reset to the default.");
     }
 
     public function destroy(Request $request): RedirectResponse
