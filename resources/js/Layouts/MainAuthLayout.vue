@@ -9,6 +9,7 @@ import {
   BookOpenIcon,
   ClipboardDocumentListIcon,
   DocumentTextIcon,
+  ExclamationTriangleIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon
@@ -38,6 +39,7 @@ const studentsPath = normalizePath(route('students'))
 const dashboardPath = normalizePath(route('dashboard'))
 const assessmentsPath = normalizePath(route('assessments.index'))
 const trackerPath = normalizePath(route('tracker.index'))
+const errorLogsPath = normalizePath(route('error-logs.index'))
 const topicsPath = normalizePath(route('topics.index'))
 const questionnairesPath = normalizePath(route('questionnaires.index'))
 const questionsPath = normalizePath(route('questions.index'))
@@ -46,6 +48,7 @@ const isDashboardActive = computed(() => currentPath.value === dashboardPath)
 const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
 const isTrackerActive = computed(() => currentPath.value.startsWith(trackerPath))
+const isErrorLogsActive = computed(() => currentPath.value.startsWith(errorLogsPath))
 const isTopicsActive = computed(() => currentPath.value.startsWith(topicsPath))
 const isQuestionnairesActive = computed(() => currentPath.value.startsWith(questionnairesPath))
 const isQuestionsActive = computed(() => currentPath.value.startsWith(questionsPath))
@@ -59,6 +62,7 @@ const navItems = computed(() => [
   { label: 'Questionnaires', href: questionnairesPath, active: isQuestionnairesActive.value, icon: ClipboardDocumentListIcon },
   { label: 'Questions', href: questionsPath, active: isQuestionsActive.value, icon: DocumentTextIcon },
   { label: 'Tracker', href: trackerPath, active: isTrackerActive.value, icon: ClockIcon },
+  { label: 'Error Logs', href: errorLogsPath, active: isErrorLogsActive.value, icon: ExclamationTriangleIcon },
   { label: 'Settings', href: settingsPath, active: isSettingsActive.value, icon: Cog6ToothIcon },
 ])
 

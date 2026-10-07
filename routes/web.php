@@ -5,6 +5,7 @@ use App\Http\Controllers\AssessmentPageController;
 use App\Http\Controllers\AssessmentRemediationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\ErrorLogController;
 use App\Http\Controllers\ExerciseSessionController;
 use App\Http\Controllers\LearnerController;
 use App\Http\Controllers\ProfileController;
@@ -66,6 +67,9 @@ Route::prefix('admin')
             ->name('exercise-sessions.destroy');
         Route::get('/students', [LearnerController::class, 'index'])->name('students');
         Route::get('/tracker', [TrackerController::class, 'index'])->name('tracker.index');
+        Route::get('/error-logs', [ErrorLogController::class, 'index'])->name('error-logs.index');
+        Route::delete('/error-logs', [ErrorLogController::class, 'destroyAll'])->name('error-logs.destroy-all');
+        Route::delete('/error-logs/{errorLog}', [ErrorLogController::class, 'destroy'])->name('error-logs.destroy');
         Route::post('/students/{enrollment}/login', [StudentImpersonationController::class, 'store'])
             ->name('students.impersonate');
         Route::post('/students/bulk-register', [EnrollmentController::class, 'bulkRegister'])->name('students.bulk-register');
