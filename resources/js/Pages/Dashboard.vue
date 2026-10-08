@@ -170,9 +170,17 @@ const assessmentHref = (assessment) =>
                             <p class="text-sm font-bold uppercase tracking-widest text-slate-500">Awaiting marking</p>
                             <p class="text-xs text-slate-400">Submitted exercises, newest first.</p>
                         </div>
-                        <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                            {{ pending.length }}
-                        </span>
+                        <div class="flex items-center gap-3">
+                            <Link
+                                :href="route('exercises.submissions.index')"
+                                class="text-[10px] font-semibold uppercase tracking-widest text-sky-600 hover:text-sky-700"
+                            >
+                                View all
+                            </Link>
+                            <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                {{ pending.length }}
+                            </span>
+                        </div>
                     </div>
 
                     <div v-if="pending.length" class="divide-y divide-slate-100">

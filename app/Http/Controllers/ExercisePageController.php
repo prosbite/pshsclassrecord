@@ -65,6 +65,54 @@ class ExercisePageController extends Controller
         ]);
     }
 
+    public function submissions(Request $request)
+    {
+        $schoolYear = SchoolYear::current();
+        $tab = $request->query('tab') === 'assigned' ? 'assigned' : 'submitted';
+        $search = trim((string) $request->query('search', ''));
+
+        $base = ExerciseSession::query()
+            ->when($schoolYear, fn ($query) => $query->whereHas(
+                'assessment',
+                fn ($assessment) => $assessment->where('school_year_id', $schoolYear->id)
+            ));
+
+        $counts = [
+            'submitted' => (clone $base)->where('status', 'submitted')->count(),
+            'assigned' => (clone $base)->where('status', 'assigned')->count(),
+        ];
+
+        $sessions = (clone $base)
+            ->where('status', $tab)
+            ->when($search !== '', fn ($query) => $query->whereHas('learner', function ($learner) use ($search) {
+                $learner->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%");
+            }))
+            ->with([
+                'learner:id,first_name,middle_name,last_name',
+                'assessment:id,title,assessment_type_id,section_id,quarter_id',
+                'assessment.assessmentType:id,name,code',
+                'assessment.section:id,section_name',
+                'assessment.quarter:id,quarter',
+                'sessionQuestions:id,exercise_session_id,selected_option_id,response_text',
+            ])
+            ->when(
+                $tab === 'submitted',
+                fn ($query) => $query->orderByDesc('submitted_at')->orderByDesc('id'),
+                fn ($query) => $query->orderByDesc('created_at')->orderByDesc('id'),
+            )
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (ExerciseSession $session) => $this->mapSubmissionRow($session));
+
+        return Inertia::render('Exercises/Submissions', [
+            'tab' => $tab,
+            'search' => $search,
+            'counts' => $counts,
+            'sessions' => $sessions,
+        ]);
+    }
+
     public function create(Request $request)
     {
         $sections = $this->sectionTabs();
@@ -334,5 +382,32 @@ class ExercisePageController extends Controller
             $learner->first_name,
             $learner->middle_name ? $learner->middle_name.'.' : null,
         ])->filter()->implode(', '), ' ,');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapSubmissionRow(ExerciseSession $session): array
+    {
+        return [
+            'id' => $session->id,
+            'assessment_id' => $session->assessment?->id,
+            'assessment_title' => $session->assessment?->title,
+            'type' => $session->assessment?->assessmentType?->name,
+            'section' => $session->assessment?->section?->section_name,
+            'quarter' => $session->assessment?->quarter?->quarter,
+            'kind' => $session->kind,
+            'learner' => $session->learner ? [
+                'id' => $session->learner->id,
+                'name' => trim(collect([
+                    $session->learner->last_name,
+                    $session->learner->first_name,
+                ])->filter()->implode(', ')),
+            ] : null,
+            'submitted_at' => $session->submitted_at?->toIso8601String(),
+            'created_at' => $session->created_at?->toIso8601String(),
+            'answered_count' => $session->answered_count,
+            'total_questions' => $session->sessionQuestions->count(),
+        ];
     }
 }

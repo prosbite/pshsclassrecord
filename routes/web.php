@@ -89,6 +89,8 @@ Route::prefix('admin')
             ->name('assessments.remediation.sessions.destroy');
         Route::get('/exercises', [ExercisePageController::class, 'index'])->name('exercises.index');
         Route::get('/exercises/create', [ExercisePageController::class, 'create'])->name('exercises.create');
+        Route::get('/exercises/submissions', [ExercisePageController::class, 'submissions'])
+            ->name('exercises.submissions.index');
         Route::post('/exercises/{assessment}/sessions', [ExercisePageController::class, 'store'])
             ->name('exercises.sessions.store');
         Route::get('/exercises/students/{learner}', [ExercisePageController::class, 'student'])
