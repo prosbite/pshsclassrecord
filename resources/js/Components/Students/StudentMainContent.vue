@@ -237,6 +237,20 @@ const loginAsStudent = (student) => {
         preserveScroll: true,
     });
 };
+
+const resetStudentPassword = (student) => {
+    if (!student?.can_login) {
+        return;
+    }
+
+    if (!window.confirm(`Reset the password for ${student.name} to the default (12345678)?`)) {
+        return;
+    }
+
+    router.post(route('students.reset-password', student.id), {}, {
+        preserveScroll: true,
+    });
+};
 </script>
 
 <template>
@@ -399,14 +413,24 @@ const loginAsStudent = (student) => {
                                 {{ formatDate(student.created_at) }}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                    :disabled="!student.can_login"
-                                    @click.stop="loginAsStudent(student)"
-                                >
-                                    {{ student.can_login ? 'Login' : 'No Account' }}
-                                </button>
+                                <div class="inline-flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="!student.can_login"
+                                        @click.stop="loginAsStudent(student)"
+                                    >
+                                        {{ student.can_login ? 'Login' : 'No Account' }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-full border border-amber-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-amber-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="!student.can_login"
+                                        @click.stop="resetStudentPassword(student)"
+                                    >
+                                        Reset Password
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>

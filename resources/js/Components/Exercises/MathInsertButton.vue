@@ -122,8 +122,9 @@ onBeforeUnmount(() => {
     <!--
         Deliberately not the shared <Modal> (a native <dialog>): its top layer
         paints above MathLive's on-screen keyboard, which appends itself to
-        document.body. A normal fixed overlay at z-40/50 stacks below the
-        keyboard (z-index 105), so its keycaps stay tappable.
+        document.body. A normal fixed overlay at z-70/80 sits above the app
+        header (z-50) but below the keyboard (z-index 105), so its keycaps stay
+        tappable.
     -->
     <Teleport to="body">
         <Transition
@@ -134,10 +135,10 @@ onBeforeUnmount(() => {
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
-            <div v-if="show" class="fixed inset-0 z-40 overflow-y-auto px-4 py-6 sm:px-0">
-                <div class="fixed inset-0 z-40 bg-gray-500 opacity-75" @click="close"></div>
+            <div v-if="show" class="fixed inset-0 z-[70] overflow-y-auto px-4 py-6 sm:px-0">
+                <div class="fixed inset-0 z-[70] bg-gray-500 opacity-75" @click="close"></div>
 
-                <div class="relative z-50 mx-auto mb-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+                <div class="relative z-[80] mx-auto mb-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
                     <div class="space-y-4 p-6">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>

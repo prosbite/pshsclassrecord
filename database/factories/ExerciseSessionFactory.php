@@ -24,6 +24,7 @@ class ExerciseSessionFactory extends Factory
             'learner_id' => Learner::factory(),
             'created_by' => User::factory(),
             'status' => 'assigned',
+            'kind' => ExerciseSession::KIND_PREVENTIVE,
             'remark' => null,
             'completed_at' => null,
         ];

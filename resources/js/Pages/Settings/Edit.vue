@@ -27,7 +27,7 @@ const submit = () => {
                 <p class="text-xs uppercase tracking-[0.45em] text-slate-400">Configuration</p>
                 <h1 class="text-2xl font-semibold text-slate-900">Settings</h1>
                 <p class="text-sm text-slate-500">
-                    Preventive exercises flag learners below this passing threshold. Changing it does not alter stored sessions.
+                    Exercises flag learners below this passing threshold. Changing it does not alter stored sessions.
                 </p>
             </div>
 

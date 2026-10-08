@@ -48,6 +48,12 @@ const title = computed(
     () => props.session.assessment?.title || props.session.assessment?.assessment_type?.name || 'Exercise session'
 );
 
+const kindLabel = computed(() => (props.session.kind === 'enhancement' ? 'Enhancement' : 'Preventive'));
+
+const kindClasses = computed(() => (props.session.kind === 'enhancement'
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-indigo-100 text-indigo-700'));
+
 const attemptedCount = computed(() =>
     props.sessionQuestions.filter((question) => {
         const value = scoreValues.value[question.id];
@@ -127,6 +133,12 @@ const submit = () => {
                         {{ title }}
                         <span
                             class="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                            :class="kindClasses"
+                        >
+                            {{ kindLabel }}
+                        </span>
+                        <span
+                            class="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                             :class="session.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
                         >
                             {{ session.status }}
@@ -137,7 +149,7 @@ const submit = () => {
                     :href="route('assessments.remediation', session.assessment_id)"
                     class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:bg-slate-50"
                 >
-                    Back to preventive exercises
+                    Back to exercises
                 </Link>
             </div>
 

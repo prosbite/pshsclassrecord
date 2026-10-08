@@ -173,6 +173,7 @@ test('the remediation index splits ongoing and completed sessions with answered 
                 return count($rows) === 1
                     && $rows[0]['id'] === $ongoing->id
                     && $rows[0]['status'] === 'assigned'
+                    && $rows[0]['kind'] === 'preventive'
                     && $rows[0]['answered_count'] === 1
                     && $rows[0]['total_questions'] === 1
                     && $rows[0]['percent'] === null;
@@ -370,9 +371,91 @@ test('the student dashboard surfaces remediation status per assessment', functio
             ->component('Students/Dashboard')
             ->where("remediationByAssessment.{$this->assessment->id}.id", $session->id)
             ->where("remediationByAssessment.{$this->assessment->id}.status", 'submitted')
+            ->where("remediationByAssessment.{$this->assessment->id}.kind", 'preventive')
             ->where('remediationSummary.ongoing', 1)
             ->where('remediationSummary.completed', 0)
         );
+});
+
+test('an admin can assign an enhancement exercise to a passing learner', function () {
+    srAddText($this->questionnaire, ['prompt_text' => 'Enhance me']);
+
+    $this->assessment->learners()->sync([
+        $this->learnerA->id => ['score' => 95, 'tentative' => false],
+    ]);
+
+    $this->actingAs($this->admin)->post(
+        route('assessments.remediation.sessions.store', $this->assessment),
+        [
+            'learner_ids' => [$this->learnerA->id],
+            'questionnaire_ids' => [$this->questionnaire->id],
+            'kind' => 'enhancement',
+        ]
+    )->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    $session = ExerciseSession::where('assessment_id', $this->assessment->id)
+        ->where('learner_id', $this->learnerA->id)
+        ->first();
+
+    expect($session)->not->toBeNull()
+        ->and($session->kind)->toBe('enhancement');
+
+    $this->actingAs($this->studentA)->get(route('student.remediation.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ongoing', fn ($rows) => count($rows) === 1
+                && $rows[0]['id'] === $session->id
+                && $rows[0]['kind'] === 'enhancement')
+        );
+
+    $this->actingAs($this->studentA)->get(route('student.remediation.show', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('session.kind', 'enhancement')
+        );
+
+    $this->actingAs($this->studentA)->get(route('student.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where("remediationByAssessment.{$this->assessment->id}.kind", 'enhancement')
+        );
+});
+
+test('an enhancement request for a learner with an existing preventive session is skipped', function () {
+    srAddText($this->questionnaire);
+
+    $existing = srSession($this, $this->learnerA);
+
+    $this->actingAs($this->admin)->post(
+        route('assessments.remediation.sessions.store', $this->assessment),
+        [
+            'learner_ids' => [$this->learnerA->id],
+            'questionnaire_ids' => [$this->questionnaire->id],
+            'kind' => 'enhancement',
+        ]
+    )->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    expect(ExerciseSession::where('assessment_id', $this->assessment->id)->count())->toBe(1)
+        ->and($existing->fresh()->kind)->toBe('preventive');
+});
+
+test('all preventive exercise sessions for an assessment can be deleted at once', function () {
+    srAddText($this->questionnaire);
+
+    $first = srSession($this, $this->learnerA);
+    $second = srSession($this, $this->learnerB);
+
+    $this->actingAs($this->studentA)
+        ->delete(route('assessments.remediation.sessions.destroy', $this->assessment))
+        ->assertForbidden();
+
+    $this->actingAs($this->admin)
+        ->delete(route('assessments.remediation.sessions.destroy', $this->assessment))
+        ->assertRedirect(route('assessments.remediation', $this->assessment));
+
+    expect(ExerciseSession::where('assessment_id', $this->assessment->id)->count())->toBe(0);
+    $this->assertDatabaseMissing('exercise_session_questions', ['exercise_session_id' => $first->id]);
+    $this->assertDatabaseMissing('exercise_session_questions', ['exercise_session_id' => $second->id]);
 });
 
 test('the admin session page surfaces submitted answers and teacher overrides persist', function () {

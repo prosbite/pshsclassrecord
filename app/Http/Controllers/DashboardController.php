@@ -66,6 +66,7 @@ class DashboardController extends Controller
                 'type' => $session->assessment?->assessmentType?->name,
                 'section' => $session->assessment?->section?->section_name,
                 'quarter' => $session->assessment?->quarter?->quarter,
+                'kind' => $session->kind,
                 'learner' => $session->learner ? [
                     'id' => $session->learner->id,
                     'name' => trim(collect([
