@@ -2,22 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Enrollment;
 use App\Models\Learner;
 use App\Models\LoginActivity;
+use App\Models\SchoolYear;
 use App\Models\SimulationActivity;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class TrackerController extends Controller
 {
     public function index(Request $request)
     {
+        $notSimulatedStudents = $this->notSimulatedStudents();
+
         return Inertia::render('Tracker/Index', [
             'summary' => $this->loginSummary(),
             'topUsers' => $this->topUsers(),
             'recentActivities' => $this->recentActivities(),
-            'simulationSummary' => $this->simulationSummary(),
+            'simulationSummary' => $this->simulationSummary($notSimulatedStudents->count()),
+            'notSimulatedStudents' => $notSimulatedStudents,
             'topStudents' => $this->topStudents(),
             'recentSimulations' => $this->recentSimulations(),
         ]);
@@ -91,14 +97,71 @@ class TrackerController extends Controller
     /**
      * @return array<string, int>
      */
-    protected function simulationSummary(): array
+    protected function simulationSummary(int $notSimulatedStudents = 0): array
     {
         return [
             'total_simulations' => SimulationActivity::count(),
             'today_simulations' => SimulationActivity::whereDate('created_at', today())->count(),
             'week_simulations' => SimulationActivity::where('created_at', '>=', now()->startOfWeek())->count(),
             'unique_students' => SimulationActivity::query()->distinct()->count('user_id'),
+            'not_simulated_students' => $notSimulatedStudents,
         ];
+    }
+
+    /**
+     * Active learners in the current school year who have no simulation
+     * activity recorded. Matching falls back to the learner's linked user
+     * because a simulation row may carry only a user_id.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function notSimulatedStudents()
+    {
+        $schoolYear = SchoolYear::current();
+
+        if (! $schoolYear) {
+            return collect();
+        }
+
+        $simulatedLearnerIds = SimulationActivity::query()
+            ->whereNotNull('learner_id')
+            ->pluck('learner_id');
+
+        $simulatedUserIds = SimulationActivity::query()
+            ->whereNotNull('user_id')
+            ->pluck('user_id');
+
+        $enrollments = Enrollment::with(['learner', 'section'])
+            ->where('enrollments.school_year_id', $schoolYear->id)
+            ->where('enrollments.status', 'active')
+            ->join('learners', 'learners.id', '=', 'enrollments.learner_id')
+            ->orderBy('learners.last_name')
+            ->orderBy('learners.first_name')
+            ->select('enrollments.*')
+            ->get();
+
+        return $enrollments
+            ->reject(function (Enrollment $enrollment) use ($simulatedLearnerIds, $simulatedUserIds) {
+                $learner = $enrollment->learner;
+
+                if (! $learner) {
+                    return true;
+                }
+
+                return $simulatedLearnerIds->contains($learner->id)
+                    || ($learner->user_id !== null && $simulatedUserIds->contains($learner->user_id));
+            })
+            ->map(function (Enrollment $enrollment) {
+                $learner = $enrollment->learner;
+
+                return [
+                    'id' => $learner->id,
+                    'name' => trim(collect([$learner->last_name, $learner->first_name])->filter()->implode(', ')),
+                    'username' => $learner->email,
+                    'section' => $enrollment->section?->section_name,
+                ];
+            })
+            ->values();
     }
 
     protected function topStudents()

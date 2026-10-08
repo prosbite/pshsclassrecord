@@ -4,12 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Assessment;
 use App\Models\ExerciseSession;
-use App\Models\Learner;
 use App\Models\Questionnaire;
 use App\Models\Setting;
 use App\Models\Topic;
 use App\Services\AssessmentRemediationService;
-use App\Services\ExerciseSessionService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,7 +15,6 @@ class AssessmentRemediationController extends Controller
 {
     public function __construct(
         private readonly AssessmentRemediationService $remediation,
-        private readonly ExerciseSessionService $sessions,
     ) {}
 
     public function show(Assessment $assessment)
@@ -64,41 +61,18 @@ class AssessmentRemediationController extends Controller
 
         $kind = $data['kind'] ?? ExerciseSession::KIND_PREVENTIVE;
 
-        $learnerIds = collect($data['learner_ids'])->map(fn ($id) => (int) $id)->unique()->values();
-        $questionnaireIds = collect($data['questionnaire_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $result = $this->remediation->assignSessions(
+            $assessment,
+            $data['learner_ids'],
+            $data['questionnaire_ids'],
+            $request->user()->id,
+            $kind,
+        );
 
-        $learners = Learner::query()->whereIn('id', $learnerIds->all())->get()->keyBy('id');
+        $message = "{$result['created']} {$kind} session".($result['created'] === 1 ? '' : 's').' created';
 
-        $existing = ExerciseSession::query()
-            ->where('assessment_id', $assessment->id)
-            ->whereIn('learner_id', $learnerIds->all())
-            ->pluck('learner_id')
-            ->all();
-
-        $created = 0;
-        $skipped = 0;
-
-        foreach ($learnerIds as $learnerId) {
-            if (in_array($learnerId, array_map('intval', $existing), true)) {
-                $skipped++;
-
-                continue;
-            }
-
-            $learner = $learners->get($learnerId);
-
-            if (! $learner) {
-                continue;
-            }
-
-            $this->sessions->createFor($assessment, $learner, $questionnaireIds->all(), $request->user()->id, $kind);
-            $created++;
-        }
-
-        $message = "{$created} {$kind} session".($created === 1 ? '' : 's').' created';
-
-        if ($skipped > 0) {
-            $message .= ", {$skipped} skipped (already assigned)";
+        if ($result['skipped'] > 0) {
+            $message .= ", {$result['skipped']} skipped (already assigned)";
         }
 
         return redirect()

@@ -6,6 +6,7 @@ use App\Http\Controllers\AssessmentRemediationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ErrorLogController;
+use App\Http\Controllers\ExercisePageController;
 use App\Http\Controllers\ExerciseSessionController;
 use App\Http\Controllers\LearnerController;
 use App\Http\Controllers\ProfileController;
@@ -86,6 +87,16 @@ Route::prefix('admin')
             ->name('assessments.remediation.sessions.store');
         Route::delete('/assessments/{assessment}/remediation/sessions', [AssessmentRemediationController::class, 'destroySessions'])
             ->name('assessments.remediation.sessions.destroy');
+        Route::get('/exercises', [ExercisePageController::class, 'index'])->name('exercises.index');
+        Route::get('/exercises/create', [ExercisePageController::class, 'create'])->name('exercises.create');
+        Route::post('/exercises/{assessment}/sessions', [ExercisePageController::class, 'store'])
+            ->name('exercises.sessions.store');
+        Route::get('/exercises/students/{learner}', [ExercisePageController::class, 'student'])
+            ->name('exercises.students.show');
+        Route::delete('/exercises/sessions/{exerciseSession}', [ExercisePageController::class, 'destroy'])
+            ->name('exercises.sessions.destroy');
+        Route::delete('/exercises/{assessment}/sessions', [ExercisePageController::class, 'destroyAll'])
+            ->name('exercises.sessions.destroy-all');
         Route::get('/assessments/{assessment}/edit', [AssessmentPageController::class, 'edit'])->name('assessments.edit');
         Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
         Route::patch('/assessments/{assessment}', [AssessmentController::class, 'update']);

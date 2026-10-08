@@ -1,10 +1,11 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import {
   HomeIcon,
   UsersIcon,
   ChartBarIcon,
+  AcademicCapIcon,
   ClockIcon,
   BookOpenIcon,
   ClipboardDocumentListIcon,
@@ -38,6 +39,7 @@ const currentPath = computed(() => {
 const studentsPath = normalizePath(route('students'))
 const dashboardPath = normalizePath(route('dashboard'))
 const assessmentsPath = normalizePath(route('assessments.index'))
+const exercisesPath = normalizePath(route('exercises.index'))
 const trackerPath = normalizePath(route('tracker.index'))
 const errorLogsPath = normalizePath(route('error-logs.index'))
 const topicsPath = normalizePath(route('topics.index'))
@@ -47,6 +49,7 @@ const settingsPath = normalizePath(route('settings.edit'))
 const isDashboardActive = computed(() => currentPath.value === dashboardPath)
 const isStudentsActive = computed(() => currentPath.value.startsWith(studentsPath))
 const isAssessmentsActive = computed(() => currentPath.value.startsWith(assessmentsPath))
+const isExercisesActive = computed(() => currentPath.value.startsWith(exercisesPath))
 const isTrackerActive = computed(() => currentPath.value.startsWith(trackerPath))
 const isErrorLogsActive = computed(() => currentPath.value.startsWith(errorLogsPath))
 const isTopicsActive = computed(() => currentPath.value.startsWith(topicsPath))
@@ -58,6 +61,7 @@ const navItems = computed(() => [
   { label: 'Dashboard', href: dashboardPath, active: isDashboardActive.value, icon: HomeIcon },
   { label: 'Students', href: studentsPath, active: isStudentsActive.value, icon: UsersIcon },
   { label: 'Assessments', href: assessmentsPath, active: isAssessmentsActive.value, icon: ChartBarIcon },
+  { label: 'Exercises', href: exercisesPath, active: isExercisesActive.value, icon: AcademicCapIcon },
   { label: 'Topics', href: topicsPath, active: isTopicsActive.value, icon: BookOpenIcon },
   { label: 'Questionnaires', href: questionnairesPath, active: isQuestionnairesActive.value, icon: ClipboardDocumentListIcon },
   { label: 'Questions', href: questionsPath, active: isQuestionsActive.value, icon: DocumentTextIcon },
@@ -65,6 +69,36 @@ const navItems = computed(() => [
   { label: 'Error Logs', href: errorLogsPath, active: isErrorLogsActive.value, icon: ExclamationTriangleIcon },
   { label: 'Settings', href: settingsPath, active: isSettingsActive.value, icon: Cog6ToothIcon },
 ])
+
+const flashSuccess = computed(() => page.props.flash?.success ?? null)
+const flashError = computed(() => page.props.flash?.error ?? null)
+
+const toast = ref(null)
+let toastTimer = null
+
+const showToast = (message, type) => {
+  toast.value = { message, type }
+
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+
+  toastTimer = setTimeout(() => {
+    toast.value = null
+  }, 4000)
+}
+
+watch(
+  [flashSuccess, flashError],
+  ([success, error]) => {
+    if (success) {
+      showToast(success, 'success')
+    } else if (error) {
+      showToast(error, 'error')
+    }
+  },
+  { immediate: true },
+)
 
 const sidebarOpen = ref(false)
 const isCollapsed = ref(true)
@@ -84,6 +118,12 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
+onBeforeUnmount(() => {
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+})
+
 // Toggle collapse (desktop)
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
@@ -92,6 +132,38 @@ const toggleCollapse = () => {
 
 <template>
   <div class="min-h-screen bg-slate-50 text-slate-900 flex">
+    <!-- Toast -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="toast"
+        class="fixed right-6 top-6 z-[60] flex max-w-sm items-start gap-3 rounded-2xl border bg-white px-5 py-4 shadow-lg"
+        :class="toast.type === 'success' ? 'border-emerald-200' : 'border-rose-200'"
+        role="status"
+      >
+        <span
+          class="mt-0.5 h-2.5 w-2.5 flex-none rounded-full"
+          :class="toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"
+        ></span>
+        <p class="text-sm font-medium" :class="toast.type === 'success' ? 'text-emerald-800' : 'text-rose-800'">
+          {{ toast.message }}
+        </p>
+        <button
+          type="button"
+          class="ml-auto text-slate-400 transition hover:text-slate-600"
+          @click="toast = null"
+        >
+          ×
+        </button>
+      </div>
+    </Transition>
+
     <!-- Sidebar -->
     <div
       id="sidebar"

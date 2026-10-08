@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import MainAuthLayout from '@/Layouts/MainAuthLayout.vue';
+import Modal from '@/Components/Modal.vue';
 
 const props = defineProps({
     summary: {
@@ -29,7 +30,12 @@ const props = defineProps({
             today_simulations: 0,
             week_simulations: 0,
             unique_students: 0,
+            not_simulated_students: 0,
         }),
+    },
+    notSimulatedStudents: {
+        type: Array,
+        default: () => [],
     },
     topStudents: {
         type: Array,
@@ -42,6 +48,7 @@ const props = defineProps({
 });
 
 const activeTab = ref('login');
+const showNotSimulatedModal = ref(false);
 
 const tabs = [
     { id: 'login', label: 'Login Tracker' },
@@ -252,7 +259,7 @@ const progressWidth = (count, max) => {
 
             <!-- Simulation tracker tab -->
             <template v-else>
-                <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                     <article
                         v-for="card in simulationMetricCards"
                         :key="card.label"
@@ -262,6 +269,16 @@ const progressWidth = (count, max) => {
                         <p class="mt-3 text-3xl font-semibold text-slate-900">{{ card.value }}</p>
                         <p class="mt-2 text-sm text-slate-500">{{ card.note }}</p>
                     </article>
+
+                    <button
+                        type="button"
+                        class="rounded-3xl border border-indigo-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md"
+                        @click="showNotSimulatedModal = true"
+                    >
+                        <p class="text-xs uppercase tracking-[0.35em] text-slate-400">Not yet simulated</p>
+                        <p class="mt-3 text-3xl font-semibold text-indigo-600">{{ simulationSummary.not_simulated_students ?? 0 }}</p>
+                        <p class="mt-2 text-sm text-slate-500">Click to view the students</p>
+                    </button>
                 </section>
 
                 <section class="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
@@ -366,5 +383,54 @@ const progressWidth = (count, max) => {
                 </section>
             </template>
         </div>
+
+        <Modal :show="showNotSimulatedModal" max-width="2xl" @close="showNotSimulatedModal = false">
+            <div class="p-6">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.35em] text-slate-400">Not yet simulated</p>
+                        <h2 class="mt-1 text-lg font-semibold text-slate-900">
+                            {{ notSimulatedStudents.length }} student{{ notSimulatedStudents.length === 1 ? '' : 's' }}
+                        </h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Active students for the current school year with no simulation recorded.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="text-2xl leading-none text-slate-400 transition hover:text-slate-600"
+                        @click="showNotSimulatedModal = false"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div class="mt-4 max-h-96 overflow-y-auto">
+                    <table v-if="notSimulatedStudents.length" class="min-w-full text-left text-sm">
+                        <thead class="text-[0.7rem] uppercase tracking-[0.3em] text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3">Student</th>
+                                <th class="px-4 py-3">Section</th>
+                                <th class="px-4 py-3">Username</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr
+                                v-for="student in notSimulatedStudents"
+                                :key="student.id"
+                                class="hover:bg-slate-50"
+                            >
+                                <td class="px-4 py-3 font-semibold text-slate-900">{{ student.name }}</td>
+                                <td class="px-4 py-3 text-slate-600">{{ student.section || '—' }}</td>
+                                <td class="px-4 py-3 text-slate-500">{{ student.username || '—' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p v-else class="px-4 py-10 text-center text-sm text-slate-500">
+                        Every active student has already run a simulation.
+                    </p>
+                </div>
+            </div>
+        </Modal>
     </MainAuthLayout>
 </template>

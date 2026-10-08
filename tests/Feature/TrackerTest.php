@@ -83,6 +83,39 @@ test('the tracker page renders login and simulation data for admins', function (
         );
 });
 
+test('the tracker lists students who have not simulated yet', function () {
+    [$user, $learner, $section, $schoolYear] = trackerStudent();
+
+    $otherUser = User::factory()->create();
+    $otherUser->forceFill(['role' => 'student', 'status' => 'active'])->save();
+
+    $otherLearner = Learner::factory()->create([
+        'user_id' => $otherUser->id,
+        'first_name' => 'Aaron',
+        'last_name' => 'Zzz',
+    ]);
+
+    Enrollment::factory()->create([
+        'learner_id' => $otherLearner->id,
+        'section_id' => $section->id,
+        'school_year_id' => $schoolYear->id,
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)->post(route('student.simulation.store'), ['quarter' => 1]);
+
+    $this->actingAs(trackerAdmin())->get(route('tracker.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('simulationSummary.unique_students', 1)
+            ->where('simulationSummary.not_simulated_students', 1)
+            ->has('notSimulatedStudents', 1)
+            ->where('notSimulatedStudents.0.id', $otherLearner->id)
+            ->where('notSimulatedStudents.0.name', 'Zzz, Aaron')
+            ->where('notSimulatedStudents.0.section', $section->section_name)
+        );
+});
+
 test('non-admins cannot view the tracker page', function () {
     [$student] = trackerStudent();
 

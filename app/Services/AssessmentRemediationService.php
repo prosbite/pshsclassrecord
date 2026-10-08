@@ -6,6 +6,7 @@ use App\Models\Assessment;
 use App\Models\Enrollment;
 use App\Models\ExerciseSession;
 use App\Models\ExerciseSessionQuestion;
+use App\Models\Learner;
 use App\Models\Question;
 use App\Models\Questionnaire;
 use App\Models\SchoolYear;
@@ -63,6 +64,61 @@ class AssessmentRemediationService
                 'is_failing' => $percent !== null && $percent < $threshold,
             ];
         })->values();
+    }
+
+    /**
+     * Assign one exercise session per learner for the assessment, deduped by
+     * learner regardless of kind (a learner never has both a preventive and an
+     * enhancement session for the same assessment). Questionnaires are frozen
+     * into each newly created session.
+     *
+     * @param  array<int, int|string>  $learnerIds
+     * @param  array<int, int|string>  $questionnaireIds
+     * @return array{created: int, skipped: int}
+     */
+    public function assignSessions(
+        Assessment $assessment,
+        array $learnerIds,
+        array $questionnaireIds,
+        ?int $userId,
+        string $kind = ExerciseSession::KIND_PREVENTIVE,
+    ): array {
+        $learnerIds = collect($learnerIds)->map(fn ($id) => (int) $id)->unique()->values();
+        $questionnaireIds = collect($questionnaireIds)->map(fn ($id) => (int) $id)->unique()->values();
+
+        $learners = Learner::query()->whereIn('id', $learnerIds->all())->get()->keyBy('id');
+
+        $existing = ExerciseSession::query()
+            ->where('assessment_id', $assessment->id)
+            ->whereIn('learner_id', $learnerIds->all())
+            ->pluck('learner_id')
+            ->all();
+
+        $created = 0;
+        $skipped = 0;
+
+        // Resolved lazily to avoid a constructor cycle: ExerciseSessionService
+        // already depends on this service.
+        $sessions = app(ExerciseSessionService::class);
+
+        foreach ($learnerIds as $learnerId) {
+            if (in_array($learnerId, array_map('intval', $existing), true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            $learner = $learners->get($learnerId);
+
+            if (! $learner) {
+                continue;
+            }
+
+            $sessions->createFor($assessment, $learner, $questionnaireIds->all(), $userId, $kind);
+            $created++;
+        }
+
+        return ['created' => $created, 'skipped' => $skipped];
     }
 
     /**
