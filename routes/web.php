@@ -56,6 +56,12 @@ Route::prefix('admin')
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/school-years', [SettingsController::class, 'storeSchoolYear'])
+            ->name('settings.school-years.store');
+        Route::put('/settings/school-years/{schoolYear}/activate', [SettingsController::class, 'activateSchoolYear'])
+            ->name('settings.school-years.activate');
+        Route::put('/settings/quarters/{quarter}/activate', [SettingsController::class, 'activateQuarter'])
+            ->name('settings.quarters.activate');
         Route::resource('topics', TopicController::class)->except(['show']);
         Route::resource('questionnaires', QuestionnaireController::class)->except(['show']);
         Route::resource('questions', QuestionController::class)->except(['show']);

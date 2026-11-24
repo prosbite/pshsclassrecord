@@ -18,6 +18,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    selectedQuarterId: {
+        type: [Number, String],
+        default: null,
+    },
     sections: {
         type: Array,
         default: () => [],
@@ -106,9 +110,15 @@ watch(
 watch(
     () => props.quarters,
     (quarters) => {
-        if (!form.quarter_id && quarters.length) {
-            form.quarter_id = quarters[0].id;
+        if (form.quarter_id || !quarters.length) {
+            return;
         }
+
+        const requested = quarters.find(
+            (quarter) => String(quarter.id) === String(props.selectedQuarterId),
+        );
+
+        form.quarter_id = requested?.id ?? quarters[0].id;
     },
     { immediate: true },
 );

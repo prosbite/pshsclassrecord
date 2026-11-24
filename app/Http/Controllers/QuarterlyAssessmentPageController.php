@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Quarter;
 use App\Models\QuarterlyAssessment;
-use App\Models\Section;
 use App\Models\SchoolYear;
-use Inertia\Inertia;
+use App\Models\Section;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class QuarterlyAssessmentPageController extends Controller
 {
@@ -51,6 +51,7 @@ class QuarterlyAssessmentPageController extends Controller
             'schoolYear' => $schoolYear,
             'sections' => $sections,
             'quarters' => $quarters,
+            'selectedQuarterId' => Quarter::current()?->id,
         ]);
     }
 

@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import StudentLayout from '@/Layouts/StudentLayout.vue';
 import {
     buildQuarterResult,
@@ -22,6 +22,7 @@ const props = defineProps({
         type: Object,
         default: () => ({ ongoing: 0, completed: 0 }),
     },
+    currentQuarter: { type: Number, default: null },
 });
 
 const remediationFor = (assessmentId) => props.remediationByAssessment?.[assessmentId] ?? null;
@@ -137,7 +138,7 @@ const groupedByQuarter = computed(() => Object.fromEntries(
 const availableQuarters = computed(() =>
     quarterOrder.filter((quarter) => quarterAssessmentsByIndex.value[quarter]?.length));
 
-const selectedQuarter = ref(4);
+const selectedQuarter = ref(props.currentQuarter ?? 4);
 watch(
     availableQuarters,
     (available) => {
@@ -150,6 +151,26 @@ watch(
 
 const selectedGrouped = computed(() => groupedByQuarter.value[selectedQuarter.value] ?? null);
 const hasSelectedQuarter = computed(() => hasSegmentAssessments(selectedGrouped.value));
+
+const quarterRemediationSummary = computed(() => {
+    const summary = { ongoing: 0, completed: 0 };
+
+    (quarterAssessmentsByIndex.value[selectedQuarter.value] ?? []).forEach((assessment) => {
+        const remediation = remediationFor(assessment.id);
+
+        if (!remediation) {
+            return;
+        }
+
+        if (remediation.status === 'completed') {
+            summary.completed += 1;
+        } else {
+            summary.ongoing += 1;
+        }
+    });
+
+    return summary;
+});
 
 const segmentEntries = computed(() =>
     buildSegmentEntries(selectedGrouped.value, scoresByLearner.value, learnerId.value, tentativesByLearner.value));
@@ -356,12 +377,11 @@ const toggleSimulation = () => {
     simulationMode.value = !simulationMode.value;
 
     if (simulationMode.value) {
-        router.post(route('student.simulation.store'), {
-            quarter: selectedQuarter.value,
-        }, {
-            preserveScroll: true,
-            preserveState: true,
-        });
+        window.axios
+            .post(route('student.simulation.store'), {
+                quarter: selectedQuarter.value,
+            })
+            .catch(() => {});
     }
 };
 
@@ -463,13 +483,16 @@ const finalAdjectival = computed(() =>
                             <div class="h-2 w-2 rounded-full bg-indigo-500"></div>
                             <p class="text-xs font-medium uppercase tracking-widest text-indigo-600">Exercises</p>
                         </div>
+                        <p class="mt-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-500">
+                            {{ quarterLabels[selectedQuarter] ?? 'Selected quarter' }}
+                        </p>
                         <div class="mt-4 flex flex-wrap gap-6">
                             <p class="text-sm text-slate-600">
-                                <span class="text-2xl font-semibold text-slate-900">{{ remediationSummary.ongoing ?? 0 }}</span>
+                                <span class="text-2xl font-semibold text-slate-900">{{ quarterRemediationSummary.ongoing }}</span>
                                 ongoing
                             </p>
                             <p class="text-sm text-slate-600">
-                                <span class="text-2xl font-semibold text-slate-900">{{ remediationSummary.completed ?? 0 }}</span>
+                                <span class="text-2xl font-semibold text-slate-900">{{ quarterRemediationSummary.completed }}</span>
                                 completed
                             </p>
                         </div>

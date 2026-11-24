@@ -15,6 +15,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    selectedQuarterId: {
+        type: [Number, String],
+        default: null,
+    },
     sections: {
         type: Array,
         default: () => [],
@@ -37,6 +41,7 @@ const props = defineProps({
                 :school-year="props.schoolYear"
                 :assessment-types="props.assessmentTypes"
                 :quarters="props.quarters"
+                :selected-quarter-id="props.selectedQuarterId"
                 :sections="props.sections"
                 :topics="props.topics"
                 :questionnaires="props.questionnaires"

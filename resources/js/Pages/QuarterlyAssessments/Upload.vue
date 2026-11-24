@@ -15,6 +15,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    selectedQuarterId: {
+        type: [Number, String],
+        default: null,
+    },
 });
 </script>
 
@@ -25,6 +29,7 @@ const props = defineProps({
                 :school-year="props.schoolYear"
                 :sections="props.sections"
                 :quarters="props.quarters"
+                :selected-quarter-id="props.selectedQuarterId"
             />
         </div>
     </MainAuthLayout>

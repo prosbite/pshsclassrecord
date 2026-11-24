@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assessment;
 use App\Models\ExerciseSession;
 use App\Models\Learner;
+use App\Models\Quarter;
 use App\Models\SchoolYear;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ class StudentDashboardController extends Controller
     {
         $user = $request->user();
         $schoolYear = SchoolYear::current();
+        $currentQuarter = Quarter::current();
 
         $learner = $user?->learner;
         $section = null;
@@ -85,6 +87,7 @@ class StudentDashboardController extends Controller
             'assessments' => $assessments->values()->all(),
             'remediationByAssessment' => $remediationByAssessment,
             'remediationSummary' => $remediationSummary,
+            'currentQuarter' => $currentQuarter?->quarter,
         ]);
     }
 

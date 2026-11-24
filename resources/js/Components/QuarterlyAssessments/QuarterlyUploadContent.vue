@@ -15,7 +15,19 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    selectedQuarterId: {
+        type: [Number, String],
+        default: null,
+    },
 });
+
+const initialQuarterId = () => {
+    const match = props.quarters.find(
+        (quarter) => String(quarter.id) === String(props.selectedQuarterId),
+    );
+
+    return match ? String(match.id) : '';
+};
 
 const fileInput = ref(null);
 const fileName = ref('');
@@ -24,12 +36,12 @@ const tableRows = ref([]);
 const errorMessage = ref('');
 const isParsing = ref(false);
 const selectedSection = ref('');
-const selectedQuarter = ref('');
+const selectedQuarter = ref(initialQuarterId());
 const saveStatus = ref('');
 
 const form = useForm({
     section_id: '',
-    quarter_id: '',
+    quarter_id: initialQuarterId(),
     school_year_id: props.schoolYear?.id ?? null,
     assessment: [],
 });

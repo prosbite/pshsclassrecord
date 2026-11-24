@@ -113,7 +113,7 @@ const resolveInitialQuarter = () => {
             (quarter) => quarter.id === String(props.selectedQuarterId),
         );
 
-        if (requested?.hasAssessments) {
+        if (requested) {
             return requested.id;
         }
     }

@@ -76,7 +76,7 @@ class AssessmentPageController extends Controller
             'section' => $section,
             'sectionFilter' => $sectionFilter ?? 'all',
             'quarters' => $quarters,
-            'selectedQuarterId' => $request->query('quarter') ?? $quarters->first()?->id,
+            'selectedQuarterId' => $request->query('quarter') ?? Quarter::current()?->id ?? $quarters->first()?->id,
         ]);
     }
 
@@ -149,13 +149,16 @@ class AssessmentPageController extends Controller
     {
         $schoolYear = SchoolYear::current();
 
+        $quarters = Quarter::with('schoolYear')
+            ->when($schoolYear, fn ($query) => $query->where('school_year_id', $schoolYear->id))
+            ->orderBy('quarter')
+            ->get();
+
         return [
             'schoolYear' => $schoolYear,
             'assessmentTypes' => AssessmentType::orderBy('name')->get(),
-            'quarters' => Quarter::with('schoolYear')
-                ->when($schoolYear, fn ($query) => $query->where('school_year_id', $schoolYear->id))
-                ->orderBy('quarter')
-                ->get(),
+            'quarters' => $quarters,
+            'selectedQuarterId' => Quarter::current()?->id ?? $quarters->first()?->id,
             'sections' => Section::with('gradeLevel')
                 ->orderBy('grade_level_id')
                 ->orderBy('section_name')
