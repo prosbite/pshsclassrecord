@@ -8,6 +8,7 @@ use App\Models\LoginActivity;
 use App\Models\SchoolYear;
 use App\Models\SimulationActivity;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -16,60 +17,111 @@ class TrackerController extends Controller
 {
     public function index(Request $request)
     {
+        $filters = $this->resolveFilters($request);
         $notSimulatedStudents = $this->notSimulatedStudents();
 
         return Inertia::render('Tracker/Index', [
-            'summary' => $this->loginSummary(),
-            'topUsers' => $this->topUsers(),
-            'recentActivities' => $this->recentActivities(),
-            'simulationSummary' => $this->simulationSummary($notSimulatedStudents->count()),
+            'filters' => $filters,
+            'summary' => $this->loginSummary($filters),
+            'topUsers' => $this->topUsers($filters),
+            'recentActivities' => $this->recentActivities($filters),
+            'simulationSummary' => $this->simulationSummary($notSimulatedStudents->count(), $filters),
             'notSimulatedStudents' => $notSimulatedStudents,
-            'topStudents' => $this->topStudents(),
-            'recentSimulations' => $this->recentSimulations(),
+            'topStudents' => $this->topStudents($filters),
+            'recentSimulations' => $this->recentSimulations($filters),
         ]);
     }
 
     /**
-     * @return array<string, int>
+     * @return array{from: ?string, to: ?string}
      */
-    protected function loginSummary(): array
+    protected function resolveFilters(Request $request): array
     {
         return [
-            'total_logins' => LoginActivity::count(),
-            'today_logins' => LoginActivity::whereDate('created_at', today())->count(),
-            'week_logins' => LoginActivity::where('created_at', '>=', now()->startOfWeek())->count(),
-            'unique_users' => LoginActivity::query()->distinct()->count('user_id'),
-            'admin_assisted_logins' => LoginActivity::whereNotNull('actor_user_id')->count(),
+            'from' => $this->validDate($request->query('from')),
+            'to' => $this->validDate($request->query('to')),
         ];
     }
 
-    protected function topUsers()
+    protected function validDate(mixed $value): ?string
     {
-        return User::query()
-            ->select('id', 'name', 'email', 'username', 'role')
-            ->withCount('loginActivities')
-            ->withMax('loginActivities', 'created_at')
-            ->get()
-            ->filter(fn (User $user) => ($user->login_activities_count ?? 0) > 0)
-            ->sortByDesc('login_activities_count')
-            ->values()
-            ->map(fn (User $user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'username' => $user->username,
-                'role' => $user->role,
-                'login_count' => $user->login_activities_count ?? 0,
-                'last_login_at' => $user->login_activities_max_created_at,
-            ]);
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $value);
+
+        return $date && $date->format('Y-m-d') === $value ? $value : null;
     }
 
-    protected function recentActivities()
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     */
+    protected function applyDateRange(Builder $query, array $filters): Builder
     {
-        return LoginActivity::with([
+        return $query
+            ->when($filters['from'], fn (Builder $inner) => $inner->whereDate('created_at', '>=', $filters['from']))
+            ->when($filters['to'], fn (Builder $inner) => $inner->whereDate('created_at', '<=', $filters['to']));
+    }
+
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     * @return array<string, int>
+     */
+    protected function loginSummary(array $filters): array
+    {
+        $query = $this->applyDateRange(LoginActivity::query(), $filters);
+
+        return [
+            'total_logins' => (clone $query)->count(),
+            'today_logins' => LoginActivity::whereDate('created_at', today())->count(),
+            'week_logins' => LoginActivity::where('created_at', '>=', now()->startOfWeek())->count(),
+            'unique_users' => (clone $query)->distinct()->count('user_id'),
+            'admin_assisted_logins' => (clone $query)->whereNotNull('actor_user_id')->count(),
+        ];
+    }
+
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     */
+    protected function topUsers(array $filters)
+    {
+        $rows = $this->applyDateRange(LoginActivity::query(), $filters)
+            ->whereNotNull('user_id')
+            ->selectRaw('user_id, count(*) as login_count, max(created_at) as last_login_at')
+            ->groupBy('user_id')
+            ->orderByDesc('login_count')
+            ->get();
+
+        $users = User::query()
+            ->whereIn('id', $rows->pluck('user_id')->unique()->all())
+            ->get(['id', 'name', 'email', 'username', 'role'])
+            ->keyBy('id');
+
+        return $rows->map(function ($row) use ($users) {
+            $user = $users->get($row->user_id);
+
+            return [
+                'id' => $row->user_id,
+                'name' => $user?->name,
+                'email' => $user?->email,
+                'username' => $user?->username,
+                'role' => $user?->role,
+                'login_count' => (int) $row->login_count,
+                'last_login_at' => $row->last_login_at,
+            ];
+        })->values();
+    }
+
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     */
+    protected function recentActivities(array $filters)
+    {
+        return $this->applyDateRange(LoginActivity::with([
             'user:id,name,email,username,role',
             'actor:id,name,email,username,role',
-        ])
+        ]), $filters)
             ->latest()
             ->limit(20)
             ->get()
@@ -95,15 +147,18 @@ class TrackerController extends Controller
     }
 
     /**
+     * @param  array{from: ?string, to: ?string}  $filters
      * @return array<string, int>
      */
-    protected function simulationSummary(int $notSimulatedStudents = 0): array
+    protected function simulationSummary(int $notSimulatedStudents, array $filters): array
     {
+        $query = $this->applyDateRange(SimulationActivity::query(), $filters);
+
         return [
-            'total_simulations' => SimulationActivity::count(),
+            'total_simulations' => (clone $query)->count(),
             'today_simulations' => SimulationActivity::whereDate('created_at', today())->count(),
             'week_simulations' => SimulationActivity::where('created_at', '>=', now()->startOfWeek())->count(),
-            'unique_students' => SimulationActivity::query()->distinct()->count('user_id'),
+            'unique_students' => (clone $query)->distinct()->count('user_id'),
             'not_simulated_students' => $notSimulatedStudents,
         ];
     }
@@ -164,9 +219,12 @@ class TrackerController extends Controller
             ->values();
     }
 
-    protected function topStudents()
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     */
+    protected function topStudents(array $filters)
     {
-        $rows = SimulationActivity::query()
+        $rows = $this->applyDateRange(SimulationActivity::query(), $filters)
             ->selectRaw('user_id, learner_id, count(*) as simulation_count, max(created_at) as last_simulation_at')
             ->groupBy('user_id', 'learner_id')
             ->orderByDesc('simulation_count')
@@ -202,13 +260,16 @@ class TrackerController extends Controller
         })->values();
     }
 
-    protected function recentSimulations()
+    /**
+     * @param  array{from: ?string, to: ?string}  $filters
+     */
+    protected function recentSimulations(array $filters)
     {
-        return SimulationActivity::with([
+        return $this->applyDateRange(SimulationActivity::with([
             'user:id,name,email,username,role',
             'learner:id,first_name,middle_name,last_name',
             'section:id,section_name',
-        ])
+        ]), $filters)
             ->latest()
             ->limit(20)
             ->get()

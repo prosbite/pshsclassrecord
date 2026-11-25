@@ -1,10 +1,14 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
 import MainAuthLayout from '@/Layouts/MainAuthLayout.vue';
 import Modal from '@/Components/Modal.vue';
 
 const props = defineProps({
+    filters: {
+        type: Object,
+        default: () => ({ from: null, to: null }),
+    },
     summary: {
         type: Object,
         default: () => ({
@@ -55,6 +59,80 @@ const tabs = [
     { id: 'simulation', label: 'Simulation Tracker' },
 ];
 
+const filterForm = ref({
+    from: props.filters?.from ?? '',
+    to: props.filters?.to ?? '',
+});
+
+watch(
+    () => props.filters,
+    (filters) => {
+        filterForm.value = {
+            from: filters?.from ?? '',
+            to: filters?.to ?? '',
+        };
+    },
+    { deep: true },
+);
+
+const hasFilters = computed(() => Boolean(props.filters?.from || props.filters?.to));
+
+const formatDateLabel = (value) => {
+    if (!value) return '—';
+
+    const date = new Date(`${value}T00:00:00`);
+
+    return Number.isNaN(date.getTime())
+        ? value
+        : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const filterSummary = computed(() => {
+    const { from, to } = props.filters ?? {};
+
+    if (!from && !to) {
+        return 'Showing all login and simulation activity.';
+    }
+
+    if (from && to) {
+        return `Showing login and simulation activity from ${formatDateLabel(from)} to ${formatDateLabel(to)}.`;
+    }
+
+    if (from) {
+        return `Showing login and simulation activity from ${formatDateLabel(from)} onward.`;
+    }
+
+    return `Showing login and simulation activity up to ${formatDateLabel(to)}.`;
+});
+
+const applyFilters = () => {
+    const query = {};
+
+    if (filterForm.value.from) {
+        query.from = filterForm.value.from;
+    }
+
+    if (filterForm.value.to) {
+        query.to = filterForm.value.to;
+    }
+
+    router.get(route('tracker.index'), query, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+};
+
+const clearFilters = () => {
+    filterForm.value = { from: '', to: '' };
+
+    router.get(route('tracker.index'), {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+};
+
 const formatDateTime = (value) => {
     if (!value) return '—';
 
@@ -71,18 +149,38 @@ const topLoginCount = computed(() => props.topUsers[0]?.login_count ?? 0);
 const topSimulationCount = computed(() => props.topStudents[0]?.simulation_count ?? 0);
 
 const loginMetricCards = computed(() => [
-    { label: 'Total sign-ins', value: props.summary.total_logins ?? 0, note: 'All successful logins recorded' },
+    {
+        label: 'Total sign-ins',
+        value: props.summary.total_logins ?? 0,
+        note: hasFilters.value ? 'Sign-ins in the selected range' : 'All successful logins recorded',
+    },
     { label: 'Today', value: props.summary.today_logins ?? 0, note: 'Logins since midnight' },
     { label: 'This week', value: props.summary.week_logins ?? 0, note: 'Logins in the current week' },
-    { label: 'Unique users', value: props.summary.unique_users ?? 0, note: 'Users who have signed in' },
-    { label: 'Admin-assisted', value: props.summary.admin_assisted_logins ?? 0, note: 'Logins done through the student switch' },
+    {
+        label: 'Unique users',
+        value: props.summary.unique_users ?? 0,
+        note: hasFilters.value ? 'Users who signed in during the range' : 'Users who have signed in',
+    },
+    {
+        label: 'Admin-assisted',
+        value: props.summary.admin_assisted_logins ?? 0,
+        note: hasFilters.value ? 'Admin-assisted sign-ins in the range' : 'Logins done through the student switch',
+    },
 ]);
 
 const simulationMetricCards = computed(() => [
-    { label: 'Total simulations', value: props.simulationSummary.total_simulations ?? 0, note: 'Times students entered simulation' },
+    {
+        label: 'Total simulations',
+        value: props.simulationSummary.total_simulations ?? 0,
+        note: hasFilters.value ? 'Simulations in the selected range' : 'Times students entered simulation',
+    },
     { label: 'Today', value: props.simulationSummary.today_simulations ?? 0, note: 'Simulations since midnight' },
     { label: 'This week', value: props.simulationSummary.week_simulations ?? 0, note: 'Simulations in the current week' },
-    { label: 'Unique students', value: props.simulationSummary.unique_students ?? 0, note: 'Students who have simulated' },
+    {
+        label: 'Unique students',
+        value: props.simulationSummary.unique_students ?? 0,
+        note: hasFilters.value ? 'Students who simulated during the range' : 'Students who have simulated',
+    },
 ]);
 
 const progressWidth = (count, max) => {
@@ -135,6 +233,47 @@ const progressWidth = (count, max) => {
                     >
                         {{ tab.label }}
                     </button>
+                </div>
+            </section>
+
+            <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <label class="block">
+                            <span class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">From</span>
+                            <input
+                                v-model="filterForm.from"
+                                type="date"
+                                class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-44"
+                                @change="applyFilters"
+                            />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">To</span>
+                            <input
+                                v-model="filterForm.to"
+                                type="date"
+                                class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-44"
+                                @change="applyFilters"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            class="rounded-2xl bg-slate-900 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-slate-800"
+                            @click="applyFilters"
+                        >
+                            Apply
+                        </button>
+                        <button
+                            v-if="hasFilters || filterForm.from || filterForm.to"
+                            type="button"
+                            class="rounded-2xl border border-slate-200 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:bg-slate-50"
+                            @click="clearFilters"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500">{{ filterSummary }}</p>
                 </div>
             </section>
 
